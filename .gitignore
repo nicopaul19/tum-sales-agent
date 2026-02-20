@@ -1,0 +1,39 @@
+# Secrets & environment
+.env
+.env.local
+.env.*.local
+credentials.json
+token.json
+
+# Business data — NEVER commit
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude
+.claude/
+
+# Logs
+*.log
+
+# Generated PDFs
+*.pdf

@@ -1,0 +1,11 @@
+openai
+notion-client
+requests
+python-dotenv
+rich
+watchdog
+pandas
+pydantic
+matplotlib
+fpdf2
+beautifulsoup4
