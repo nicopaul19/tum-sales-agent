@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -28,6 +28,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.config import LINKEDIN_DUMP_DIR
 
 console = Console()
+GENERIC_LINK_TEXT = {
+    "message",
+    "nachricht",
+    "connect",
+    "vernetzen",
+    "follow",
+    "folgen",
+}
 
 
 # =============================================================================
@@ -64,6 +72,12 @@ def _normalize_linkedin_url(url: str) -> str:
         return f"https://www.linkedin.com/in/{slug}"
 
     return url.strip()
+
+
+def _clean_connection_name(name: str) -> str:
+    """Return a plausible contact name, or an empty string for generic action text."""
+    name = re.sub(r"\s+", " ", name or "").strip()
+    return "" if name.lower() in GENERIC_LINK_TEXT else name
 
 
 # =============================================================================
@@ -143,7 +157,7 @@ def _connections_strategy_data_view(soup: BeautifulSoup) -> Tuple[List[ParsedCon
             continue
         seen_urls.add(profile_url)
 
-        # Clean name — remove duplicated text from headline concatenation
+        name = _clean_connection_name(name)
         if not name:
             name = profile_url.split("/in/")[-1].replace("-", " ").title()
 
@@ -177,7 +191,7 @@ def _connections_strategy_class(soup: BeautifulSoup) -> Tuple[List[ParsedConnect
             "[class*='actor-name'], "
             "h3, span.name"
         )
-        name = name_el.get_text(strip=True) if name_el else ""
+        name = _clean_connection_name(name_el.get_text(strip=True) if name_el else "")
         if not name:
             continue
 
@@ -208,22 +222,24 @@ def _connections_strategy_structural(soup: BeautifulSoup) -> Tuple[List[ParsedCo
         profile_url = _normalize_linkedin_url(href)
         if not profile_url or profile_url in seen_urls:
             continue
-        seen_urls.add(profile_url)
 
-        # Skip "Nachricht" (Message) buttons — they have aria-label but no real name
+        # Skip message/action buttons. Do this before marking the URL as seen,
+        # because LinkedIn often repeats the same profile URL on the real name link.
         aria_label = link.get("aria-label", "")
-        if aria_label.lower() in ("nachricht", "message"):
+        link_text = _clean_connection_name(link.get_text(" ", strip=True))
+        if not link_text and aria_label.lower() in GENERIC_LINK_TEXT:
             continue
 
-        name = link.get_text(strip=True)
+        name = link_text
         if not name or len(name) > 100 or len(name) < 2:
             parent = link.parent
             if parent:
                 name_el = parent.select_one("h3, h4, span, strong")
-                name = name_el.get_text(strip=True) if name_el else ""
+                name = _clean_connection_name(name_el.get_text(" ", strip=True) if name_el else "")
         if not name or len(name) < 2:
             continue
 
+        seen_urls.add(profile_url)
         connections.append(ParsedConnection(name=name, profile_url=profile_url))
 
     if connections:

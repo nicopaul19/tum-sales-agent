@@ -32,12 +32,14 @@ from rich.panel import Panel
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.config import OPENAI_API_KEY, NOTION_DB_CONTACTS_ID, NOTION_DB_ACCOUNTS_ID
+from utils.config import OPENAI_API_KEY, NOTION_DB_CONTACTS_ID, NOTION_DB_ACCOUNTS_ID, DEFAULT_CAMPAIGN_SENDER
 from utils.api_logger import log_api_usage
 from utils.notion_client import (
     ensure_contact_outreach_properties,
     get_contacts_for_copywriting,
+    get_accounts_for_copywriting,
     update_contact_outreach,
+    update_account_outreach,
 )
 from utils.preflight import run_preflight
 
@@ -57,6 +59,22 @@ CAREERS_FETCH_TITLES = {
     "marketing", "brand", "communications", "pr ",
 }
 
+
+def resolve_campaign_sender(sender: str = "", interactive: bool = True) -> str:
+    """Resolve the human sender for this campaign."""
+    sender = (sender or "").strip() or (DEFAULT_CAMPAIGN_SENDER or "").strip()
+    if sender:
+        return sender
+    if interactive:
+        sender = console.input("[bold]Who will execute this campaign? Full sender name: [/bold]").strip()
+        if sender:
+            return sender
+    raise ValueError("Campaign sender is required. Pass --sender \"Full Name\" or set DEFAULT_CAMPAIGN_SENDER in .env.")
+
+
+def _sender_first_name(sender: str) -> str:
+    return (sender or "").strip().split()[0] if (sender or "").strip() else "there"
+
 # A/B Test variant addenda — injected into the system prompt
 VARIANT_ADDENDA = {
     "A": (
@@ -68,7 +86,7 @@ VARIANT_ADDENDA = {
     "B": (
         "\n\n## A/B TEST VARIANT B — VALUE PROP FRAMING\n"
         "When describing TUM Social AI's work with partners, use this framing:\n"
-        "\"We're multiplying the impact of our social partners like UN Women in over 50 countries through custom AI tools\"\n"
+        "\"We're multiplying the impact of our non-profit partners like UN Women in over 50 countries through custom AI tools\"\n"
         "Emphasize the scale and tangible impact. Make the reader feel the reach."
     ),
 }
@@ -163,6 +181,8 @@ def build_contact_prompt(contact: dict) -> str:
     first_name = person_name.split()[0] if person_name and person_name != "Unknown" else "there"
     job_title = contact.get("job_title", "")
     email = contact.get("email", "")
+    sender_full_name = contact.get("campaign_sender") or DEFAULT_CAMPAIGN_SENDER or ""
+    sender_first_name = _sender_first_name(sender_full_name)
 
     company_name = contact.get("company_name", "Unknown")
     industry = contact.get("industry", "")
@@ -178,6 +198,10 @@ def build_contact_prompt(contact: dict) -> str:
 
     lines = [
         "Generate 4 outreach messages for this contact.\n",
+        "## SENDER",
+        f"- Full name: {sender_full_name}",
+        f"- First name for LinkedIn sign-off: {sender_first_name}",
+        "",
         "## CONTACT",
         f"- Name: {person_name}",
         f"- First name (use in greeting): {first_name}",
@@ -228,9 +252,9 @@ def build_contact_prompt(contact: dict) -> str:
     lines.append("- Each message MUST reference something specific about this company or contact")
     lines.append("- LinkedIn 1st Cold: max 75 words")
     lines.append("- LinkedIn FU: max 60 words, SAME hook/topic as cold message. Only reference facts from the cold message or from the CONTACT/COMPANY context above. NEVER invent new projects, partnerships, awards, or achievements that aren't explicitly provided.")
-    lines.append("- Cold Email Subject: max 8 words, Title Case for proper nouns")
-    lines.append("- Cold Email Body: max 100 words, sign with 'Nicolas Paul\\nCo-Founder | TUM Social AI | tum-socialaiclub.de'")
-    lines.append("- LinkedIn sign-off: 'Best, Nicolas'")
+    lines.append("- Cold Email Subject: MUST exactly follow this format: 'COMPANY_NAME || TUM Social AI: TRIGGER_TOPIC'")
+    lines.append(f"- Cold Email Body: max 100 words, sign with ONLY '{sender_full_name}'. Do NOT include titles or links.")
+    lines.append(f"- LinkedIn sign-off: 'Best, {sender_first_name}'")
     lines.append("- Be SPECIFIC about what this company does — never use generic terms like 'IT services' or 'technology sector'")
 
     return "\n".join(lines)
@@ -274,13 +298,24 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
     log_api_usage(
         "copywriter_agent", "generate_outreach", "gpt-4o",
         response.usage,
-        {"contact": contact.get("person_name", ""), "company": contact.get("company_name", ""), "variant": variant}
+        {
+            "contact": contact.get("person_name", ""),
+            "company": contact.get("company_name", ""),
+            "variant": variant,
+            "sender": contact.get("campaign_sender", ""),
+        }
     )
 
     return result
 
 
-def run_copywriter(campaign_id: str = "", dry_run: bool = False, force: bool = False):
+def run_copywriter(
+    campaign_id: str = "",
+    dry_run: bool = False,
+    force: bool = False,
+    sender: str = "",
+    interactive: bool = True,
+):
     """
     Generate outreach messages for contacts missing them.
 
@@ -302,9 +337,15 @@ def run_copywriter(campaign_id: str = "", dry_run: bool = False, force: bool = F
     if not OPENAI_API_KEY:
         console.print("[red]Error: OPENAI_API_KEY not configured[/red]")
         return
-    if not NOTION_DB_CONTACTS_ID:
-        console.print("[red]Error: NOTION_DB_CONTACTS_ID not configured[/red]")
+    if not NOTION_DB_CONTACTS_ID and not NOTION_DB_ACCOUNTS_ID:
+        console.print("[red]Error: NOTION_DB_CONTACTS_ID or NOTION_DB_ACCOUNTS_ID not configured[/red]")
         return
+    try:
+        campaign_sender = resolve_campaign_sender(sender, interactive=interactive)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        return
+    console.print(f"[cyan]Campaign sender: {campaign_sender}[/cyan]")
 
     # Load skill prompt
     skill_prompt = load_skill_prompt()
@@ -315,32 +356,44 @@ def run_copywriter(campaign_id: str = "", dry_run: bool = False, force: bool = F
     if LEARNINGS_PATH.exists():
         console.print(f"[cyan]Learnings file found — will inject into prompts[/cyan]")
 
-    # Ensure outreach properties exist on Contacts DB
-    console.print("\n[cyan]Ensuring outreach properties on Contacts DB...[/cyan]")
-    ensure_contact_outreach_properties(NOTION_DB_CONTACTS_ID)
+    contacts_available = True
+    prop_map = None
 
     # Preflight validation
     accounts_db_id = NOTION_DB_ACCOUNTS_ID or ""
     if accounts_db_id and NOTION_DB_CONTACTS_ID:
+        console.print("\n[cyan]Ensuring outreach properties on Contacts DB...[/cyan]")
+        contacts_available = ensure_contact_outreach_properties(NOTION_DB_CONTACTS_ID)
         console.print("\n[cyan]Running preflight validation...[/cyan]")
         preflight = run_preflight(accounts_db_id, NOTION_DB_CONTACTS_ID)
         if not preflight.success:
-            console.print("\n[bold red]Preflight found errors — properties listed above are missing from your Notion databases.[/bold red]")
-            console.print("[yellow]Proceeding may cause API errors or missing data for those fields.[/yellow]")
-            answer = console.input("\n[bold]Continue anyway? (y/N): [/bold]").strip().lower()
-            if answer not in ("y", "yes"):
-                console.print("[red]Aborted.[/red]")
-                return
-            console.print("[yellow]Continuing with available mappings...[/yellow]\n")
+            contact_only_errors = preflight.errors and all(
+                "Contacts" in err or "Contacts DB" in err or "Failed to fetch Contacts" in err
+                for err in preflight.errors
+            )
+            if contact_only_errors:
+                contacts_available = False
+                console.print("[yellow]Contacts DB unavailable — falling back to Accounts DB outreach fields.[/yellow]")
+            else:
+                console.print("\n[bold red]Preflight found errors — properties listed above are missing from your Notion databases.[/bold red]")
+                console.print("[yellow]Proceeding may cause API errors or missing data for those fields.[/yellow]")
+                answer = "no"
+                if interactive:
+                    answer = console.input("\n[bold]Continue anyway? (y/N): [/bold]").strip().lower()
+                if answer not in ("y", "yes"):
+                    console.print("[red]Aborted.[/red]")
+                    return
+                console.print("[yellow]Continuing with available mappings...[/yellow]\n")
         prop_map = preflight.prop_map
-    else:
-        prop_map = None
 
     # Fetch contacts needing messages
     filter_label = f"campaign={campaign_id}" if campaign_id else "all campaigns"
     mode_label = "all contacts" if force else "contacts without outreach messages"
     console.print(f"\n[cyan]Fetching {mode_label} ({filter_label})...[/cyan]")
-    contacts = get_contacts_for_copywriting(NOTION_DB_CONTACTS_ID, campaign_id, force=force, prop_map=prop_map)
+    if contacts_available and NOTION_DB_CONTACTS_ID:
+        contacts = get_contacts_for_copywriting(NOTION_DB_CONTACTS_ID, campaign_id, force=force, prop_map=prop_map)
+    else:
+        contacts = get_accounts_for_copywriting(NOTION_DB_ACCOUNTS_ID, campaign_id, force=force, prop_map=prop_map)
 
     if not contacts:
         console.print("[green]All contacts already have outreach messages. Nothing to do.[/green]")
@@ -361,6 +414,7 @@ def run_copywriter(campaign_id: str = "", dry_run: bool = False, force: bool = F
     for i, contact in enumerate(contacts, 1):
         person = contact.get("person_name", "?")
         company = contact.get("company_name", "?")
+        contact["campaign_sender"] = contact.get("campaign_sender") or campaign_sender
         variant = assign_variant()
         variant_counts[variant] += 1
         console.print(f"\n[bold]({i}/{len(contacts)}) {person} @ {company} [dim]variant {variant}[/dim][/bold]")
@@ -392,15 +446,26 @@ def run_copywriter(campaign_id: str = "", dry_run: bool = False, force: bool = F
             ))
 
             if not dry_run:
-                ok = update_contact_outreach(
-                    contact_page_id=contact["contact_page_id"],
-                    linkedin_first=messages.linkedin_first_cold,
-                    linkedin_fu=messages.linkedin_follow_up,
-                    email_body=messages.cold_email_body,
-                    email_subject=messages.cold_email_subject,
-                    ab_variant=variant,
-                    prop_map=prop_map,
-                )
+                if contact.get("contact_storage") == "account":
+                    ok = update_account_outreach(
+                        account_page_id=contact["account_page_id"],
+                        linkedin_first=messages.linkedin_first_cold,
+                        linkedin_fu=messages.linkedin_follow_up,
+                        email_body=messages.cold_email_body,
+                        email_subject=messages.cold_email_subject,
+                        ab_variant=variant,
+                        prop_map=prop_map,
+                    )
+                else:
+                    ok = update_contact_outreach(
+                        contact_page_id=contact["contact_page_id"],
+                        linkedin_first=messages.linkedin_first_cold,
+                        linkedin_fu=messages.linkedin_follow_up,
+                        email_body=messages.cold_email_body,
+                        email_subject=messages.cold_email_subject,
+                        ab_variant=variant,
+                        prop_map=prop_map,
+                    )
                 if ok:
                     written += 1
                     console.print(f"  [green]Written to Notion[/green]")
@@ -425,6 +490,7 @@ def run_copywriter(campaign_id: str = "", dry_run: bool = False, force: bool = F
     summary.add_row("Variant A / B", f"{variant_counts['A']} / {variant_counts['B']}")
     if campaign_id:
         summary.add_row("Campaign filter", campaign_id)
+    summary.add_row("Campaign sender", campaign_sender)
     console.print(summary)
 
 
@@ -433,6 +499,14 @@ if __name__ == "__main__":
     parser.add_argument("--campaign", default="", help="Only process contacts from this campaign (e.g. Workflow_0902)")
     parser.add_argument("--dry-run", action="store_true", help="Preview messages without writing to Notion")
     parser.add_argument("--force", action="store_true", help="Regenerate ALL messages (overwrite existing)")
+    parser.add_argument("--sender", default="", help="Full name of the teammate executing this campaign")
+    parser.add_argument("--no-input", action="store_true", help="Fail instead of prompting for missing sender/confirmations")
     args = parser.parse_args()
 
-    run_copywriter(campaign_id=args.campaign, dry_run=args.dry_run, force=args.force)
+    run_copywriter(
+        campaign_id=args.campaign,
+        dry_run=args.dry_run,
+        force=args.force,
+        sender=args.sender,
+        interactive=not args.no_input,
+    )

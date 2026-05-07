@@ -61,6 +61,10 @@ FOLLOW_UP_DAYS = 3
 GHOSTED_DAYS = 10
 
 
+class LinkedInManagerError(RuntimeError):
+    """Raised when the LinkedIn manager cannot safely complete a run."""
+
+
 # =============================================================================
 # Pydantic Models for GPT-4o Structured Output
 # =============================================================================
@@ -84,7 +88,11 @@ def _get_status_rank(status: str) -> int:
 
 
 def _should_update_status(current_status: str, new_status: str) -> bool:
-    """Return True only if new_status is a higher rank (upgrade). Never downgrade."""
+    """Return True only if new_status is a higher rank (upgrade), with specific exceptions like Nurture."""
+    # Exception: Ghosting moves lead to Nurture
+    if new_status == "Nurture" and current_status in ("Contacted LinkedIn \U0001f310", "Contacted Mail \U0001f4e9"):
+        return True
+
     current_rank = _get_status_rank(current_status)
     new_rank = _get_status_rank(new_status)
     if new_rank < 0:
@@ -166,8 +174,7 @@ def _notion_patch(url: str, body: dict) -> Optional[dict]:
 def fetch_all_contacts() -> List[dict]:
     """Paginated query of the Contacts database."""
     if not NOTION_TOKEN or not NOTION_DB_CONTACTS_ID:
-        console.print("[red]Error: NOTION_TOKEN or NOTION_DB_CONTACTS_ID not configured[/red]")
-        return []
+        raise LinkedInManagerError("NOTION_TOKEN or NOTION_DB_CONTACTS_ID not configured")
 
     url = f"https://api.notion.com/v1/databases/{NOTION_DB_CONTACTS_ID}/query"
     results = []
@@ -180,7 +187,10 @@ def fetch_all_contacts() -> List[dict]:
 
         data = _notion_post(url, body)
         if not data:
-            break
+            raise LinkedInManagerError(
+                f"Could not query Notion Contacts database {NOTION_DB_CONTACTS_ID}. "
+                "Check the database ID and share/access for the Notion integration."
+            )
 
         results.extend(data.get("results", []))
         if not data.get("has_more", False):
@@ -189,6 +199,60 @@ def fetch_all_contacts() -> List[dict]:
 
     console.print(f"[cyan]Fetched {len(results)} contacts from Notion[/cyan]")
     return results
+
+
+def fetch_all_accounts() -> List[dict]:
+    """Paginated query of the Accounts database."""
+    if not NOTION_TOKEN or not NOTION_DB_ACCOUNTS_ID:
+        raise LinkedInManagerError("NOTION_TOKEN or NOTION_DB_ACCOUNTS_ID not configured")
+
+    url = f"https://api.notion.com/v1/databases/{NOTION_DB_ACCOUNTS_ID}/query"
+    results = []
+    start_cursor = None
+
+    while True:
+        body = {"page_size": 100}
+        if start_cursor:
+            body["start_cursor"] = start_cursor
+
+        data = _notion_post(url, body)
+        if not data:
+            raise LinkedInManagerError(
+                f"Could not query Notion Accounts database {NOTION_DB_ACCOUNTS_ID}. "
+                "Check the database ID and share/access for the Notion integration."
+            )
+
+        results.extend(data.get("results", []))
+        if not data.get("has_more", False):
+            break
+        start_cursor = data.get("next_cursor")
+
+    console.print(f"[cyan]Fetched {len(results)} accounts from Notion[/cyan]")
+    return results
+
+
+def _text_from_property(prop_data: dict) -> str:
+    """Extract plain text from common Notion property shapes."""
+    prop_type = prop_data.get("type")
+    if prop_type == "rich_text":
+        return "".join(t.get("plain_text", "") for t in prop_data.get("rich_text", []))
+    if prop_type == "title":
+        return "".join(t.get("plain_text", "") for t in prop_data.get("title", []))
+    if prop_type == "formula":
+        formula = prop_data.get("formula") or {}
+        if formula.get("type") == "string":
+            return formula.get("string") or ""
+    if prop_type == "url":
+        return prop_data.get("url") or ""
+    return ""
+
+
+def _first_property_text(props: dict, names: List[str]) -> str:
+    for name in names:
+        value = _text_from_property(props.get(name, {})).strip()
+        if value:
+            return value
+    return ""
 
 
 def build_linkedin_lookup(contacts: List[dict]) -> Dict[str, dict]:
@@ -237,6 +301,42 @@ def build_linkedin_lookup(contacts: List[dict]) -> Dict[str, dict]:
     return lookup
 
 
+def build_account_linkedin_lookup(accounts: List[dict]) -> Dict[str, dict]:
+    """Build a LinkedIn lookup directly from Accounts DB contact fields."""
+    lookup = {}
+
+    for page in accounts:
+        props = page.get("properties", {})
+        account_id = page.get("id", "")
+
+        linkedin_url = _first_property_text(props, ["[Suspect] Contact LinkedIn URL", "LinkedIn"])
+        normalized = _normalize_linkedin_url(linkedin_url)
+        if not normalized:
+            continue
+
+        contact_name = _first_property_text(
+            props,
+            ["[Suspect] Contact Name", "Main Contact First Name", "Main Contact Last Name"],
+        )
+        if not contact_name:
+            first_name = _first_property_text(props, ["Main Contact First Name"])
+            last_name = _first_property_text(props, ["Main Contact Last Name"])
+            contact_name = f"{first_name} {last_name}".strip()
+
+        account_name = _first_property_text(props, ["Organization*", "Cleaned Name*"])
+
+        lookup[normalized] = {
+            "contact_id": "",
+            "contact_name": contact_name or account_name,
+            "account_ids": [account_id] if account_id else [],
+            "cold_message": _first_property_text(props, ["LinkedIn 1st Cold"]),
+            "fu_message": _first_property_text(props, ["LinkedIn FU message"]),
+        }
+
+    console.print(f"[cyan]Built LinkedIn lookup: {len(lookup)} accounts with contact URLs[/cyan]")
+    return lookup
+
+
 def fetch_account_page(account_id: str) -> Optional[dict]:
     """Fetch a single Account page and extract key fields including last_edited_time."""
     data = _notion_get(f"https://api.notion.com/v1/pages/{account_id}")
@@ -260,7 +360,28 @@ def fetch_account_page(account_id: str) -> Optional[dict]:
                 org_name = title_arr[0].get("plain_text", "")
             break
 
-    # Extract last_edited_time (top-level page metadata)
+    # Extract Campaign ID (multi_select)
+    campaign_ids = []
+    campaign_prop = props.get("Campaign ID", {})
+    if campaign_prop.get("type") == "multi_select":
+        campaign_ids = [ms.get("name", "") for ms in campaign_prop.get("multi_select", [])]
+
+    # Extract Date Contacted LinkedIn
+    date_contacted_str = ""
+    date_contacted_prop = props.get("Date Contacted LinkedIn", {})
+    if date_contacted_prop.get("type") == "date" and date_contacted_prop.get("date"):
+        date_contacted_str = date_contacted_prop["date"].get("start", "")
+
+    date_contacted = None
+    if date_contacted_str:
+        try:
+            date_contacted = datetime.fromisoformat(date_contacted_str.replace("Z", "+00:00"))
+            if date_contacted.tzinfo is None:
+                date_contacted = date_contacted.replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            pass
+
+    # Extract last_edited_time (top-level page metadata) as fallback
     last_edited_str = data.get("last_edited_time", "")
     last_edited = None
     if last_edited_str:
@@ -273,7 +394,9 @@ def fetch_account_page(account_id: str) -> Optional[dict]:
         "page_id": account_id,
         "status": status,
         "organization": org_name,
+        "campaign_ids": campaign_ids,
         "last_edited_time": last_edited,
+        "date_contacted_linkedin": date_contacted,
     }
 
 
@@ -302,11 +425,15 @@ def fetch_contact_outreach(contact_id: str) -> dict:
     return {"cold_message": cold_msg, "fu_message": fu_msg}
 
 
-def update_account_status(account_id: str, status: str) -> bool:
+def update_account_status(account_id: str, status: str, update_contacted_date: bool = False) -> bool:
     """Update the Status property on an Account page."""
+    properties = {"Status": {"status": {"name": status}}}
+    if update_contacted_date:
+        properties["Date Contacted LinkedIn"] = {"date": {"start": datetime.now(timezone.utc).isoformat()}}
+
     result = _notion_patch(
         f"https://api.notion.com/v1/pages/{account_id}",
-        {"properties": {"Status": {"status": {"name": status}}}}
+        {"properties": properties}
     )
     return result is not None
 
@@ -383,12 +510,15 @@ def apply_logic(
     connections: List[ParsedConnection],
     linkedin_lookup: Dict[str, dict],
     dry_run: bool = False,
+    campaigns: Optional[List[str]] = None,
 ) -> List[ActionItem]:
     """
     Apply outreach logic rules:
     A — New Connections: connect request accepted (from HTML)
     B — Follow-Ups: contacted 3+ days ago with no progress (from Notion)
     C — Ghosted: contacted 10+ days ago with no progress (from Notion)
+
+    If campaigns is set, only process accounts belonging to those Campaign IDs.
     """
     actions: List[ActionItem] = []
     gpt_calls = 0
@@ -430,6 +560,12 @@ def apply_logic(
         contact_name = contact_info.get("contact_name", "")
         contact_id = contact_info.get("contact_id", "")
 
+        # Campaign filter: skip accounts not in the requested campaigns
+        if campaigns:
+            account_campaigns = account.get("campaign_ids", [])
+            if not any(c in campaigns for c in account_campaigns):
+                continue
+
         # --- Rule A: New Connections ---
         # Trigger if person is now in connections AND status < "Contacted LinkedIn 🌐"
         # This covers: Suspect, Prospect Qualified, Connect. Request sent
@@ -439,12 +575,13 @@ def apply_logic(
         if normalized_url in connections_set and current_status_rank >= 0 and current_status_rank < contacted_linkedin_rank:
             new_status = "Contacted LinkedIn \U0001f310"
             if _should_update_status(current_status, new_status):
-                if not dry_run:
-                    update_account_status(account_id, new_status)
                 console.print(f"[green]  A: {contact_name} — connected! {current_status} -> {new_status}[/green]")
 
                 # Fetch outreach context from contact
-                outreach = fetch_contact_outreach(contact_id) if contact_id else {}
+                outreach = fetch_contact_outreach(contact_id) if contact_id else {
+                    "cold_message": contact_info.get("cold_message", ""),
+                    "fu_message": contact_info.get("fu_message", ""),
+                }
 
                 actions.append(ActionItem(
                     category="new_connection",
@@ -455,23 +592,23 @@ def apply_logic(
                     new_status=new_status,
                     cold_message=outreach.get("cold_message", ""),
                     fu_message=outreach.get("fu_message", ""),
+                    account_id=account_id,
+                    update_contacted_date=True,
                 ))
             continue  # Don't apply other rules to fresh connections
 
         # --- Rules B & C: Follow-Ups and Ghosted (Notion-driven) ---
         if current_status == "Contacted LinkedIn \U0001f310":
-            last_edited = account.get("last_edited_time")
-            if not last_edited:
+            ref_date = account.get("date_contacted_linkedin") or account.get("last_edited_time")
+            if not ref_date:
                 continue
 
-            days_since = (now - last_edited).days
+            days_since = (now - ref_date).days
 
             if days_since >= GHOSTED_DAYS:
-                # Rule C: Ghosted
-                new_status = "Nurture"
+                # Rule C: Ghosted (move to Email after ghosting 1st & 2nd LinkedIn msgs)
+                new_status = "Contacted Mail \U0001f4e9"
                 if _should_update_status(current_status, new_status):
-                    if not dry_run:
-                        update_account_status(account_id, new_status)
                     actions.append(ActionItem(
                         category="ghosted",
                         partner_name=contact_name,
@@ -480,12 +617,16 @@ def apply_logic(
                         old_status=current_status,
                         new_status=new_status,
                         reasoning=f"No response for {days_since} days after LinkedIn outreach",
+                        account_id=account_id,
                     ))
                     console.print(f"[red]  C: {contact_name} — ghosted ({days_since}d)[/red]")
 
             elif days_since >= FOLLOW_UP_DAYS:
                 # Rule B: Follow-Up needed
-                outreach = fetch_contact_outreach(contact_id) if contact_id else {}
+                outreach = fetch_contact_outreach(contact_id) if contact_id else {
+                    "cold_message": contact_info.get("cold_message", ""),
+                    "fu_message": contact_info.get("fu_message", ""),
+                }
                 cold_msg = outreach.get("cold_message", "")
                 fu_msg = outreach.get("fu_message", "")
 
@@ -522,6 +663,29 @@ def apply_logic(
                     fu_message=fu_msg,
                 ))
                 console.print(f"[yellow]  B: {contact_name} — follow-up needed ({days_since}d)[/yellow]")
+
+        elif current_status == "Contacted Mail \U0001f4e9":
+            ref_date = account.get("last_edited_time")
+            if not ref_date:
+                continue
+
+            days_since = (now - ref_date).days
+
+            if days_since >= GHOSTED_DAYS:
+                # Rule D: Email Ghosted -> Nurture
+                new_status = "Nurture"
+                if _should_update_status(current_status, new_status):
+                    actions.append(ActionItem(
+                        category="ghosted",
+                        partner_name=contact_name,
+                        profile_url=normalized_url,
+                        account_name=account_name,
+                        old_status=current_status,
+                        new_status=new_status,
+                        reasoning=f"No response for {days_since} days after Email outreach",
+                        account_id=account_id,
+                    ))
+                    console.print(f"[red]  D: {contact_name} — email ghosted ({days_since}d), moving to Nurture[/red]")
 
     return actions
 
@@ -644,7 +808,11 @@ def send_email_report(actions: List[ActionItem], pdf_path: Path, csv_path: Optio
 # Orchestrator
 # =============================================================================
 
-def run_linkedin_manager(dry_run: bool = False):
+def run_linkedin_manager(
+    dry_run: bool = False,
+    campaigns: Optional[List[str]] = None,
+    connections_path: Optional[Path] = None,
+):
     """Run the full LinkedIn analysis pipeline."""
     console.print("\n" + "=" * 60)
     console.print("[bold magenta]TUM Social AI — LinkedIn Analyst Agent[/bold magenta]")
@@ -655,40 +823,55 @@ def run_linkedin_manager(dry_run: bool = False):
 
     # Validate config
     if not OPENAI_API_KEY:
-        console.print("[red]Error: OPENAI_API_KEY not set in .env[/red]")
-        return
+        raise LinkedInManagerError("OPENAI_API_KEY not set in .env")
     if not NOTION_TOKEN:
-        console.print("[red]Error: NOTION_TOKEN not set in .env[/red]")
-        return
+        raise LinkedInManagerError("NOTION_TOKEN not set in .env")
     if not NOTION_DB_CONTACTS_ID:
-        console.print("[red]Error: NOTION_DB_CONTACTS_ID not set in .env[/red]")
-        return
+        raise LinkedInManagerError("NOTION_DB_CONTACTS_ID not set in .env")
     if not NOTION_DB_ACCOUNTS_ID:
-        console.print("[red]Error: NOTION_DB_ACCOUNTS_ID not set in .env[/red]")
-        return
+        raise LinkedInManagerError("NOTION_DB_ACCOUNTS_ID not set in .env")
 
     # Step 1: Parse connections HTML
     console.print("\n[cyan]Step 1: Parsing connections HTML...[/cyan]")
-    connections, parse_warnings = parse_connections()
+    connections, parse_warnings = parse_connections(connections_path=connections_path)
 
     if parse_warnings:
         for w in parse_warnings:
             console.print(f"  [yellow]Warning: {w}[/yellow]")
 
     console.print(f"  Connections parsed: {len(connections)}")
+    if not connections:
+        raise LinkedInManagerError("No LinkedIn connections could be parsed from the saved HTML")
 
     # Step 2: Fetch Notion contacts and build lookup
     console.print("\n[cyan]Step 2: Fetching Notion contacts...[/cyan]")
-    contacts = fetch_all_contacts()
-    linkedin_lookup = build_linkedin_lookup(contacts)
+    lookup_source = "Contacts"
+    try:
+        contacts = fetch_all_contacts()
+        linkedin_lookup = build_linkedin_lookup(contacts)
+    except LinkedInManagerError as e:
+        console.print(f"[yellow]Contacts DB unavailable: {e}[/yellow]")
+        console.print("[yellow]Falling back to Accounts DB contact fields...[/yellow]")
+        lookup_source = "Accounts"
+        accounts = fetch_all_accounts()
+        linkedin_lookup = build_account_linkedin_lookup(accounts)
 
     if not linkedin_lookup:
-        console.print("[yellow]No contacts with LinkedIn URLs found in Notion[/yellow]")
-        return
+        if lookup_source == "Contacts":
+            console.print("[yellow]No LinkedIn URLs found in Contacts DB; trying Accounts DB contact fields...[/yellow]")
+            lookup_source = "Accounts"
+            accounts = fetch_all_accounts()
+            linkedin_lookup = build_account_linkedin_lookup(accounts)
+
+    if not linkedin_lookup:
+        raise LinkedInManagerError("No LinkedIn URLs found in Notion Contacts or Accounts")
 
     # Step 3: Apply logic rules
-    console.print("\n[cyan]Step 3: Applying outreach logic rules...[/cyan]")
-    actions = apply_logic(connections, linkedin_lookup, dry_run=dry_run)
+    if campaigns:
+        console.print(f"\n[cyan]Step 3: Applying outreach logic rules (campaigns: {', '.join(campaigns)})...[/cyan]")
+    else:
+        console.print("\n[cyan]Step 3: Applying outreach logic rules...[/cyan]")
+    actions = apply_logic(connections, linkedin_lookup, dry_run=dry_run, campaigns=campaigns)
     console.print(f"  Actions generated: {len(actions)}")
 
     # Step 4: Generate PDF report
@@ -698,6 +881,7 @@ def run_linkedin_manager(dry_run: bool = False):
         "contacts_in_notion": len(linkedin_lookup),
         "accounts_checked": len({ci["account_ids"][0] for ci in linkedin_lookup.values() if ci.get("account_ids")}),
         "gpt_calls": sum(1 for a in actions if a.category == "follow_up" and a.draft_message),
+        "lookup_source": lookup_source,
     }
     pdf_path = generate_linkedin_report(actions, stats)
     console.print(f"[green]  Report saved: {pdf_path}[/green]")
@@ -708,14 +892,45 @@ def run_linkedin_manager(dry_run: bool = False):
         console.print("\n[cyan]Step 4.5: Exporting actionable items to CSV...[/cyan]")
         csv_path = export_actions_to_csv(actions)
 
-    # Step 5: Send email
+    # Step 5: Send email & Update Notion
     if not dry_run:
         console.print("\n[cyan]Step 5: Sending email report...[/cyan]")
-        send_email_report(actions, pdf_path, csv_path, stats)
+        email_success = send_email_report(actions, pdf_path, csv_path, stats)
+        
+        if email_success:
+            console.print("\n[cyan]Step 6: Updating Notion database...[/cyan]")
+            updates_made = 0
+            for action in actions:
+                if action.account_id and action.old_status != action.new_status:
+                    update_account_status(
+                        action.account_id, 
+                        action.new_status, 
+                        update_contacted_date=action.update_contacted_date
+                    )
+                    updates_made += 1
+            console.print(f"[green]  {updates_made} accounts updated in Notion![/green]")
+        else:
+            console.print("\n[red]Step 6: Skipping Notion updates because email report failed![/red]")
+            # Send an error email
+            try:
+                import smtplib
+                from email.mime.text import MIMEText
+                
+                err_msg = MIMEText("The LinkedIn Agent encountered an error while sending the outreach report. As a security measure, NO lead statuses have been updated in Notion.\n\nPlease check the agent logs.", "plain")
+                err_msg["Subject"] = "ERROR: LinkedIn Agent Failed to Send Report"
+                err_msg["From"] = GMAIL_ADDRESS
+                err_msg["To"] = REPORT_RECIPIENT_EMAIL or GMAIL_ADDRESS
+                
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+                    server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+                    server.send_message(err_msg)
+            except Exception as outer_e:
+                console.print(f"[red]Could not even send the error email: {outer_e}[/red]")
+            
     else:
-        console.print("\n[dim]Step 5: Skipping email (dry run)[/dim]")
+        console.print("\n[dim]Step 5/6: Skipping email and Notion updates (dry run)[/dim]")
 
-    # Step 6: Rich summary table
+    # Step 7: Rich summary table
     if actions:
         table = Table(title="Outreach Actions Summary")
         table.add_column("Category", style="bold", max_width=15)
@@ -732,7 +947,14 @@ def run_linkedin_manager(dry_run: bool = False):
             }.get(a.category, "")
 
             status_change = f"{a.old_status} -> {a.new_status}" if a.old_status != a.new_status else a.old_status
-            detail = a.draft_message[:40] if a.draft_message else (a.reasoning[:40] if a.reasoning else "")
+            if a.draft_message:
+                detail = a.draft_message[:40]
+            elif a.cold_message:
+                detail = a.cold_message[:40]
+            elif a.reasoning:
+                detail = a.reasoning[:40]
+            else:
+                detail = ""
 
             table.add_row(
                 f"[{style}]{a.category}[/{style}]",
@@ -754,6 +976,18 @@ def run_linkedin_manager(dry_run: bool = False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TUM Social AI — LinkedIn Analyst Agent")
     parser.add_argument("--dry-run", action="store_true", help="Preview actions without updating Notion or sending email")
+    parser.add_argument("--campaigns", default="", help="Comma-separated Campaign IDs to filter (e.g. Workflow_2002,Workflow_0902)")
+    parser.add_argument("--connections-file", default="", help="Path to a saved LinkedIn network/connections HTML file")
     args = parser.parse_args()
 
-    run_linkedin_manager(dry_run=args.dry_run)
+    campaigns = [c.strip() for c in args.campaigns.split(",") if c.strip()] if args.campaigns else None
+    connections_path = Path(args.connections_file).expanduser() if args.connections_file else None
+    try:
+        run_linkedin_manager(
+            dry_run=args.dry_run,
+            campaigns=campaigns,
+            connections_path=connections_path,
+        )
+    except LinkedInManagerError as e:
+        console.print(f"\n[bold red]LinkedIn Analyst Agent failed: {e}[/bold red]")
+        sys.exit(1)

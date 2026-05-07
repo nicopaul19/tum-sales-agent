@@ -26,7 +26,7 @@ echo "=== Ranking run: $(date) ===" >> "$LOG_FILE"
 
 source "$PROJECT_DIR/venv/bin/activate"
 cd "$PROJECT_DIR"
-python -m agents.ranking_agent >> "$LOG_FILE" 2>&1
+python3 -m agents.ranking_agent >> "$LOG_FILE" 2>&1
 
 EXITCODE=$?
 echo "=== Exit code: $EXITCODE ===" >> "$LOG_FILE"

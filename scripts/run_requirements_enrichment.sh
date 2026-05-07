@@ -1,13 +1,13 @@
 #!/bin/bash
-# Run the collector agent with venv activation and logging.
-# Used by launchd for scheduled collection runs (Mon/Wed/Fri at 09:00).
+# Wrapper script for Requirements DB enrichment (launchd)
+# Schedule: Monday 7:00 AM
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 LOG_DIR="$PROJECT_DIR/data/logs"
-LOG_FILE="$LOG_DIR/collector_$(date +%Y%m%d).log"
+LOG_FILE="$LOG_DIR/requirements_enrichment_$(date +%Y%m%d).log"
 
-# Wait for Google Drive to be available (max 60 seconds)
+# Wait for Google Drive to be available (up to 60s)
 TIMEOUT=60
 ELAPSED=0
 while [ ! -d "$PROJECT_DIR" ] && [ $ELAPSED -lt $TIMEOUT ]; do
@@ -21,15 +21,13 @@ if [ ! -d "$PROJECT_DIR" ]; then
 fi
 
 mkdir -p "$LOG_DIR"
-
-echo "=== Collector run: $(date) ===" >> "$LOG_FILE"
+echo "=== Requirements Enrichment run: $(date) ===" >> "$LOG_FILE"
 
 source "$PROJECT_DIR/venv/bin/activate"
 cd "$PROJECT_DIR"
-python3 -m agents.collector >> "$LOG_FILE" 2>&1
 
+python3 scripts/enrich_requirements.py >> "$LOG_FILE" 2>&1
 EXITCODE=$?
-echo "=== Exit code: $EXITCODE ===" >> "$LOG_FILE"
-echo "" >> "$LOG_FILE"
 
+echo "=== Exit code: $EXITCODE ===" >> "$LOG_FILE"
 exit $EXITCODE

@@ -27,6 +27,7 @@ GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 REPORT_RECIPIENT_EMAIL = os.getenv("REPORT_RECIPIENT_EMAIL")
 RANKING_REPORT_RECIPIENTS = os.getenv("RANKING_REPORT_RECIPIENTS")  # Comma-separated email list for ranking reports
 FEEDBACK_REPORT_RECIPIENTS = os.getenv("FEEDBACK_REPORT_RECIPIENTS")  # Comma-separated email list for feedback reports
+DEFAULT_CAMPAIGN_SENDER = os.getenv("DEFAULT_CAMPAIGN_SENDER")  # Optional default outreach sender full name
 
 # Data Paths
 DATA_DIR = PROJECT_ROOT / "data"

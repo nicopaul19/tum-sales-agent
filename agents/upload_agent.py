@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.config import (
     NOTION_DB_ACCOUNTS_ID,
     NOTION_DB_CONTACTS_ID,
+    DEFAULT_CAMPAIGN_SENDER,
     QUALIFIED_CSV,
     QUALIFIED_NO_CONTACT_CSV,
     NO_PERSON_CSV,
@@ -48,6 +49,18 @@ from utils.notion_client import (
 from utils.preflight import run_preflight
 
 console = Console()
+
+
+def resolve_campaign_sender(sender: str = "", interactive: bool = True) -> str:
+    """Resolve the human sender for this campaign."""
+    sender = (sender or "").strip() or (DEFAULT_CAMPAIGN_SENDER or "").strip()
+    if sender:
+        return sender
+    if interactive:
+        sender = console.input("[bold]Who will execute this campaign? Full sender name: [/bold]").strip()
+        if sender:
+            return sender
+    raise ValueError("Campaign sender is required. Pass --sender \"Full Name\" or set DEFAULT_CAMPAIGN_SENDER in .env.")
 
 
 def normalize_domain(domain: str) -> str:
@@ -71,7 +84,7 @@ def find_missing_companies(no_contact_df: pd.DataFrame, apollo_df: pd.DataFrame)
     Matches by company_domain (primary) and company_name (fallback).
 
     Args:
-        no_contact_df: Weekly qualified leads WITHOUT contact
+        no_contact_df: Campaign shortlist leads WITHOUT contact
         apollo_df: Apollo-enriched DataFrame
 
     Returns:
@@ -277,7 +290,7 @@ def is_contact_duplicate(data: dict, contacts_lookup: dict) -> bool:
     return False
 
 
-def run_upload(csv_path: str):
+def run_upload(csv_path: str, sender: str = "", dry_run: bool = False, interactive: bool = True):
     """
     Upload Apollo-enriched leads to Notion.
 
@@ -289,9 +302,18 @@ def run_upload(csv_path: str):
         console.print(f"[red]Error: CSV file not found: {csv_path}[/red]")
         return
 
+    try:
+        campaign_sender = resolve_campaign_sender(sender, interactive=interactive)
+    except ValueError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        return
+
     console.print("\n" + "=" * 60)
     console.print("[bold magenta]TUM Sales Agent - Upload Agent[/bold magenta]")
     console.print(f"[dim]{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}[/dim]")
+    console.print(f"[cyan]Campaign sender: {campaign_sender}[/cyan]")
+    if dry_run:
+        console.print("[yellow]DRY RUN — no Notion writes[/yellow]")
     console.print("=" * 60)
 
     # Load Apollo CSV
@@ -318,7 +340,10 @@ def run_upload(csv_path: str):
                     console.print(f"  - {row.get('company_name', '?')} ({row.get('company_domain', '?')})")
                 if len(missing) > 10:
                     console.print(f"  ... and {len(missing) - 10} more")
-                save_no_person_found(missing)
+                if dry_run:
+                    console.print(f"[yellow]Dry run — would append {len(missing)} companies to {NO_PERSON_CSV.name}[/yellow]")
+                else:
+                    save_no_person_found(missing)
             else:
                 console.print(f"[green]Apollo found contacts for all {no_contact_count} no-contact companies[/green]")
 
@@ -332,30 +357,47 @@ def run_upload(csv_path: str):
     if not NOTION_DB_ACCOUNTS_ID or not NOTION_DB_CONTACTS_ID:
         console.print("[red]Error: NOTION_DB_ACCOUNTS_ID and NOTION_DB_CONTACTS_ID must be set in .env[/red]")
         return
-    ensure_notion_properties(NOTION_DB_ACCOUNTS_ID, NOTION_DB_CONTACTS_ID)
+    if not dry_run:
+        ensure_notion_properties(NOTION_DB_ACCOUNTS_ID, NOTION_DB_CONTACTS_ID)
+    else:
+        console.print("[dim]Dry run — skipping Notion schema patch[/dim]")
 
     # --- Step 2b: Preflight validation ---
     console.print("\n[cyan]Step 2b: Running preflight validation...[/cyan]")
     preflight = run_preflight(NOTION_DB_ACCOUNTS_ID, NOTION_DB_CONTACTS_ID)
     if not preflight.success:
-        console.print("\n[bold red]Preflight found errors — properties listed above are missing from your Notion databases.[/bold red]")
-        console.print("[yellow]Proceeding may cause API errors or missing data for those fields.[/yellow]")
-        answer = console.input("\n[bold]Continue anyway? (y/N): [/bold]").strip().lower()
-        if answer not in ("y", "yes"):
-            console.print("[red]Aborted.[/red]")
-            return
-        console.print("[yellow]Continuing with available mappings...[/yellow]\n")
+        contact_only_errors = preflight.errors and all(
+            "Contacts" in err or "Contacts DB" in err or "Failed to fetch Contacts" in err
+            for err in preflight.errors
+        )
+        if contact_only_errors:
+            console.print("[yellow]Contacts DB unavailable — continuing with Accounts DB contact fields only.[/yellow]")
+        else:
+            console.print("\n[bold red]Preflight found errors — properties listed above are missing from your Notion databases.[/bold red]")
+            console.print("[yellow]Proceeding may cause API errors or missing data for those fields.[/yellow]")
+            answer = "no"
+            if interactive:
+                answer = console.input("\n[bold]Continue anyway? (y/N): [/bold]").strip().lower()
+            if answer not in ("y", "yes"):
+                console.print("[red]Aborted.[/red]")
+                return
+            console.print("[yellow]Continuing with available mappings...[/yellow]\n")
     prop_map = preflight.prop_map
     status_map = preflight.status_map
+    contacts_available = not any("Contacts" in err or "Failed to fetch Contacts" in err for err in preflight.errors)
 
     # --- Step 3: Fetch existing Notion data ---
     console.print("\n[cyan]Step 3: Fetching existing Notion data...[/cyan]")
     accounts_lookup = get_existing_accounts_from_notion(NOTION_DB_ACCOUNTS_ID, prop_map=prop_map)
-    contacts_lookup = get_existing_contacts_from_notion(NOTION_DB_CONTACTS_ID)
+    contacts_lookup = get_existing_contacts_from_notion(NOTION_DB_CONTACTS_ID) if contacts_available else {
+        "emails": set(), "linkedin_urls": set(), "names": set()
+    }
 
     # --- Step 4: Parse and group Apollo rows by company ---
     console.print("\n[cyan]Step 4: Parsing Apollo rows...[/cyan]")
     parsed_rows = [parse_apollo_row(row) for _, row in apollo_df.iterrows()]
+    for row in parsed_rows:
+        row["campaign_sender"] = campaign_sender
     company_groups = group_by_company(parsed_rows)
     console.print(f"[cyan]Grouped into {len(company_groups)} companies[/cyan]")
 
@@ -383,6 +425,11 @@ def run_upload(csv_path: str):
 
         # Check if account exists
         existing = find_existing_account(account_data, accounts_lookup)
+
+        if dry_run:
+            console.print("  [yellow]Dry run — would create/update account and store sender/contact fields[/yellow]")
+            accounts_skipped += 1
+            continue
 
         if existing:
             page_id = existing["page_id"]
@@ -425,6 +472,11 @@ def run_upload(csv_path: str):
                 page_id = ""
 
         # Process contacts for this company
+        if not contacts_available:
+            console.print("  [yellow]Contacts DB unavailable — contact saved on Account fallback fields[/yellow]")
+            contacts_skipped += len(rows)
+            continue
+
         for contact_data in rows:
             person_name = contact_data.get("person_name", "").strip()
             if not person_name:
@@ -445,6 +497,7 @@ def run_upload(csv_path: str):
                 job_title=contact_data.get("job_title", ""),
                 phone=contact_data.get("phone", ""),
                 apollo_contact_id=contact_data.get("apollo_contact_id", ""),
+                campaign_sender=campaign_sender,
                 database_id=NOTION_DB_CONTACTS_ID,
                 prop_map=prop_map,
             )
@@ -482,12 +535,16 @@ def run_upload(csv_path: str):
     summary.add_row("", "")
     summary.add_row("Errors", str(errors))
     summary.add_row("Campaign ID", campaign_id)
+    summary.add_row("Campaign sender", campaign_sender)
     console.print(summary)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Upload Apollo-enriched leads to Notion")
     parser.add_argument("--csv", required=True, help="Path to the Apollo-enriched CSV file")
+    parser.add_argument("--sender", default="", help="Full name of the teammate executing this campaign")
+    parser.add_argument("--dry-run", action="store_true", help="Preview upload without writing to Notion")
+    parser.add_argument("--no-input", action="store_true", help="Fail instead of prompting for missing sender/confirmations")
     args = parser.parse_args()
 
-    run_upload(args.csv)
+    run_upload(args.csv, sender=args.sender, dry_run=args.dry_run, interactive=not args.no_input)
