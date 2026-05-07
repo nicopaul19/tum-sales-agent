@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>TUM Social AI — Strategic Partnerships Agents</title>
+  <title>TUM Social AI — Strategic Partnerships · Technical Reference</title>
   <style>
     :root {
       --bg: #f7f8fb;
@@ -15,556 +15,393 @@
       --accent-2: #8a4b20;
       --accent-3: #1a4f8a;
       --code: #101828;
-      --tag-green: #d1fae5; --tag-green-ink: #064e3b;
-      --tag-yellow: #fef9c3; --tag-yellow-ink: #713f12;
-      --tag-red: #fee2e2; --tag-red-ink: #7f1d1d;
-      --tag-blue: #dbeafe; --tag-blue-ink: #1e3a5f;
-      --tag-gray: #f1f5f9; --tag-gray-ink: #334155;
+      --node-input:   #dbeafe; --node-input-ink:   #1e3a5f; --node-input-border:   #93c5fd;
+      --node-auto:    #d1fae5; --node-auto-ink:    #064e3b; --node-auto-border:    #6ee7b7;
+      --node-manual:  #fef9c3; --node-manual-ink:  #713f12; --node-manual-border:  #fde047;
+      --node-file:    #f1f5f9; --node-file-ink:    #334155; --node-file-border:    #cbd5e1;
+      --node-monthly: #ede9fe; --node-monthly-ink: #3b0764; --node-monthly-border: #c4b5fd;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-      line-height: 1.55;
-    }
-    header {
-      background: var(--panel);
-      border-bottom: 1px solid var(--line);
-      padding: 48px 24px 32px;
-    }
+    body { margin: 0; background: var(--bg); color: var(--ink);
+           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; line-height: 1.55; }
+    header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 40px 24px 28px; }
     .wrap { max-width: 1100px; margin: 0 auto; }
-    .eyebrow {
-      color: var(--accent);
-      font-size: 13px; font-weight: 700;
-      letter-spacing: .08em; text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-    h1 { font-size: 42px; line-height: 1.08; margin: 0 0 14px; }
-    .lead { max-width: 760px; color: var(--muted); font-size: 18px; margin: 0; }
-    main { padding: 28px 24px 56px; }
-    section {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 24px; margin: 18px 0;
-    }
-    h2 { font-size: 24px; margin: 0 0 12px; }
-    h3 { font-size: 17px; margin: 22px 0 8px; color: var(--accent); }
-    h4 { font-size: 14px; margin: 18px 0 6px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
-    p { margin: 10px 0; }
-    ul, ol { padding-left: 22px; }
-    li { margin: 6px 0; }
-    table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
-    th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-    th { color: var(--muted); font-weight: 700; background: #fafbfc; }
-    code {
-      background: #eef2f6; color: var(--code);
-      padding: 2px 5px; border-radius: 5px;
-      font-family: "SFMono-Regular", Consolas, monospace; font-size: .92em;
-    }
-    pre {
-      overflow-x: auto; background: #111827; color: #f9fafb;
-      padding: 14px 16px; border-radius: 8px; font-size: 13px; line-height: 1.5;
-    }
+    .eyebrow { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .1em;
+               text-transform: uppercase; margin-bottom: 10px; }
+    h1 { font-size: 38px; line-height: 1.1; margin: 0 0 10px; }
+    .lead { max-width: 720px; color: var(--muted); font-size: 17px; margin: 0; }
+    .scope-note { display: inline-block; margin-top: 14px; padding: 7px 13px;
+                  background: #eef8f6; border: 1px solid #a7d9d1; border-radius: 6px;
+                  font-size: 13px; color: #17463f; }
+    main { padding: 24px 24px 56px; }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+              padding: 24px; margin: 16px 0; }
+    h2 { font-size: 22px; margin: 0 0 14px; }
+    h3 { font-size: 16px; margin: 20px 0 8px; color: var(--accent); }
+    h4 { font-size: 12px; margin: 16px 0 6px; text-transform: uppercase;
+         letter-spacing: .07em; color: var(--muted); font-weight: 700; }
+    p { margin: 8px 0; }
+    ul, ol { padding-left: 20px; } li { margin: 5px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13.5px; }
+    th, td { text-align: left; vertical-align: top; padding: 9px 11px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 700; background: #fafbfc; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    code { background: #eef2f6; color: var(--code); padding: 2px 5px; border-radius: 4px;
+           font-family: "SFMono-Regular", Consolas, monospace; font-size: .88em; }
+    pre { overflow-x: auto; background: #111827; color: #f9fafb; padding: 14px 16px;
+          border-radius: 8px; font-size: 12.5px; line-height: 1.6; }
     pre code { background: transparent; color: inherit; padding: 0; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
-    .mini { border: 1px solid var(--line); border-radius: 8px; padding: 14px; background: #fcfcfe; }
-    .mini strong { display: block; margin-bottom: 4px; }
-    .mini p { margin: 0; color: var(--muted); font-size: 14px; }
-    .note {
-      border-left: 4px solid var(--accent);
-      padding: 10px 14px; background: #eef8f6; color: #17463f; border-radius: 6px;
+    .note  { border-left: 4px solid var(--accent);  padding: 9px 13px; background: #eef8f6; color: #17463f; border-radius: 5px; margin: 10px 0; }
+    .warn  { border-left: 4px solid var(--accent-2); padding: 9px 13px; background: #fff5ed; color: #5f3214; border-radius: 5px; margin: 10px 0; }
+    .info  { border-left: 4px solid var(--accent-3); padding: 9px 13px; background: #eff6ff; color: #1e3a5f; border-radius: 5px; margin: 10px 0; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .param-box { background: #f8fafc; border: 1px solid var(--line); border-radius: 7px; padding: 14px; }
+    .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 6px;
+           border-radius: 4px; margin: 1px 2px; }
+    .tag-green  { background: #d1fae5; color: #064e3b; }
+    .tag-yellow { background: #fef9c3; color: #713f12; }
+    .tag-red    { background: #fee2e2; color: #7f1d1d; }
+    .tag-gray   { background: #f1f5f9; color: #334155; }
+
+    /* ── FLOW DIAGRAM ─────────────────────────────────────────────────────── */
+    .flow-diagram { padding: 8px 0 4px; overflow-x: auto; }
+
+    /* Legend */
+    .flow-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; font-size: 12px; }
+    .flow-legend-item { display: flex; align-items: center; gap: 6px; }
+    .flow-legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+
+    /* A pipeline stage = label + row of nodes */
+    .pipeline { display: flex; flex-direction: column; gap: 0; }
+    .stage { display: flex; align-items: flex-start; gap: 0; margin: 0; }
+
+    /* Column: stage label on the left */
+    .stage-label {
+      width: 110px; flex-shrink: 0;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); padding-top: 14px; text-align: right; padding-right: 14px;
     }
-    .warn {
-      border-left-color: var(--accent-2);
-      background: #fff5ed; color: #5f3214;
+
+    /* The actual nodes area */
+    .stage-nodes { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 0; }
+
+    /* Connector between stages */
+    .stage-connector { display: flex; margin-left: 110px; padding-left: 14px; }
+    .connector-line { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+    .vline { width: 2px; height: 22px; background: var(--line); margin-left: 52px; }
+    .arrow-down { width: 0; height: 0;
+                  border-left: 6px solid transparent; border-right: 6px solid transparent;
+                  border-top: 8px solid #b0bac8; margin-left: 49px; }
+    .arrow-right { width: 0; height: 0;
+                   border-top: 6px solid transparent; border-bottom: 6px solid transparent;
+                   border-left: 8px solid #b0bac8; }
+    .hline { height: 2px; width: 20px; background: var(--line); margin-top: 14px; }
+
+    /* Branch: two parallel outputs */
+    .branch-wrap { display: flex; align-items: flex-start; gap: 16px; margin-left: 110px; padding-left: 14px; padding-top: 4px; }
+    .branch-col { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+    .branch-label { font-size: 11px; color: var(--muted); font-style: italic; }
+
+    /* Node pill */
+    .node {
+      display: inline-flex; flex-direction: column;
+      border-radius: 8px; padding: 9px 13px; min-width: 110px;
+      border-width: 1.5px; border-style: solid;
+      font-size: 12.5px; line-height: 1.35;
     }
-    .info {
-      border-left-color: var(--accent-3);
-      background: #eff6ff; color: #1e3a5f;
-    }
-    .tag {
-      display: inline-block; font-size: 11px; font-weight: 700;
-      padding: 2px 7px; border-radius: 4px; margin: 1px 2px; letter-spacing: .03em;
-    }
-    .tag-green { background: var(--tag-green); color: var(--tag-green-ink); }
-    .tag-yellow { background: var(--tag-yellow); color: var(--tag-yellow-ink); }
-    .tag-red { background: var(--tag-red); color: var(--tag-red-ink); }
-    .tag-blue { background: var(--tag-blue); color: var(--tag-blue-ink); }
-    .tag-gray { background: var(--tag-gray); color: var(--tag-gray-ink); }
-    .flow {
-      background: #f8fafc; border: 1px solid var(--line);
-      border-radius: 8px; padding: 16px 20px; font-family: "SFMono-Regular", Consolas, monospace;
-      font-size: 13px; line-height: 1.7; overflow-x: auto; white-space: pre;
-    }
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .param-box {
-      background: #f8fafc; border: 1px solid var(--line);
-      border-radius: 8px; padding: 16px;
-    }
-    .param-box table { margin: 8px 0 0; }
-    details { margin: 8px 0; }
-    details summary {
-      cursor: pointer; font-weight: 600; padding: 6px 0;
-      color: var(--accent); list-style: none;
-    }
-    details summary::before { content: "▶  "; font-size: 10px; }
-    details[open] summary::before { content: "▼  "; }
+    .node-title { font-weight: 700; }
+    .node-sub   { font-size: 11px; opacity: .75; margin-top: 2px; }
+
+    .node-input   { background: var(--node-input);   color: var(--node-input-ink);   border-color: var(--node-input-border); }
+    .node-auto    { background: var(--node-auto);    color: var(--node-auto-ink);    border-color: var(--node-auto-border); }
+    .node-manual  { background: var(--node-manual);  color: var(--node-manual-ink);  border-color: var(--node-manual-border); }
+    .node-file    { background: var(--node-file);    color: var(--node-file-ink);    border-color: var(--node-file-border); }
+    .node-monthly { background: var(--node-monthly); color: var(--node-monthly-ink); border-color: var(--node-monthly-border); }
+
+    .node-plus { font-size: 16px; font-weight: 300; color: #94a3b8; align-self: center; margin: 0 2px; }
+
     @media (max-width: 700px) {
-      h1 { font-size: 32px; }
-      section { padding: 18px; }
-      table { display: block; overflow-x: auto; }
+      h1 { font-size: 28px; } section { padding: 16px; }
       .two-col { grid-template-columns: 1fr; }
+      .stage-label { width: 80px; font-size: 10px; }
+      .stage-connector, .branch-wrap { margin-left: 80px; }
     }
   </style>
 </head>
 <body>
 <header>
   <div class="wrap">
-    <div class="eyebrow">TUM Social AI · Agent Infrastructure</div>
-    <h1>Strategic Partnerships Agents</h1>
-    <p class="lead">Complete technical reference for the lead collection, scoring, outreach, and LinkedIn follow-up pipeline. Covers every parameter, data flow, and change guide a new student needs to operate and improve the system.</p>
+    <div class="eyebrow">TUM Social AI · Strategic Partnerships</div>
+    <h1>Technical Reference</h1>
+    <p class="lead">Exact parameters, data flow, scoring logic, and change guide. For commands, cadence, and setup see the Notion page.</p>
+    <span class="scope-note">This doc = <strong>how it works under the hood + how to change it.</strong> &nbsp;Notion page = what to run and when.</span>
   </div>
 </header>
 <main class="wrap">
 
-  <!-- ── OVERVIEW ─────────────────────────────────────────────────────────── -->
+  <!-- ── DATA FLOW ─────────────────────────────────────────────────────────── -->
   <section>
-    <h2>What This System Does</h2>
-    <div class="grid">
-      <div class="mini"><strong>Collect</strong><p>LinkedIn screenshots, post URLs, and manual contacts are parsed by GPT-4o Vision, deduped by domain + person, and written to a master CSV.</p></div>
-      <div class="mini"><strong>Rank</strong><p>Each pending lead is scored 0–10 by GPT-4o against 5 criteria. Leads ≥ 5 enter the campaign shortlist (capped at 25). Leads &lt; 5 go to backlog for next run.</p></div>
-      <div class="mini"><strong>Upload</strong><p>After manual Apollo enrichment, the upload agent writes accounts and contacts into Notion with campaign sender and campaign ID tags.</p></div>
-      <div class="mini"><strong>Copywrite</strong><p>4 messages per contact (LinkedIn cold, LinkedIn follow-up, email subject, email body) generated with A/B variant, sender context, trigger, and processed learnings.</p></div>
-      <div class="mini"><strong>LinkedIn Review</strong><p>Saved connections HTML is parsed, matched to Notion contacts, and the agent drafts follow-ups or marks leads as ghosted based on configurable time windows.</p></div>
-      <div class="mini"><strong>Feedback Loop</strong><p>Monthly: outcome classification → GPT-4o pattern analysis → learnings written to <code>outreach_learnings.md</code> → auto-injected into next copywriter run.</p></div>
-    </div>
-    <p class="note" style="margin-top:14px;">Campaign actions are manual and intentional. Only intake (collector) runs automatically via launchd. Ranking, outreach, and LinkedIn review happen on demand.</p>
-  </section>
+    <h2>Pipeline Data Flow</h2>
 
-  <!-- ── FULL DATA FLOW ──────────────────────────────────────────────────── -->
-  <section>
-    <h2>Full Data Flow</h2>
-    <div class="flow">
-INPUT STREAMS
-  data/inputs/images/new/           → collector → GPT-4o Vision extraction
-  data/inputs/linkedin_urls/new/    → collector → web fetch + entity extraction
-  data/inputs/manual_contacts/new/  → collector → direct parsing
-         ↓ dedup by (domain, person_name) + per-company cap
-  data/tables/master_input.csv   ← single source of truth (11 cols, status=pending)
-         ↓
-  ranking_agent  → GPT-4o 0-10 score per lead
-         ↓
-  score ≥ 5  ─→  up to 25 leads  →  weekly_qualified_leads_with_contacts.csv
-                                  →  weekly_qualified_leads_no_contact.csv
-                                  →  email report to team
-  score ≥ 5 + over cap  →  backlog.csv  (re-scored next run)
-  score &lt; 5             →  backlog.csv  (re-scored next run)
-         ↓
-  [MANUAL] Apollo enrichment of shortlist CSVs
-         ↓
-  upload_agent  →  Notion Accounts DB  +  Notion Contacts DB
-                   (dedup by Apollo ID / domain / name)
-         ↓
-  copywriter_agent  →  4 messages per contact written to Notion
-                        (LinkedIn cold + FU + email subject + body)
-                        A/B variant assigned per contact (50/50 random)
-         ↓
-  [MANUAL] Send messages via LinkedIn / email
-         ↓
-  linkedin_manager  ←  saved connections HTML  (Cmd+S from LinkedIn)
-                    →  match to Notion contacts
-                    →  draft follow-ups (3-5 day window)
-                    →  mark ghosted/nurture after configured window
-                    →  update Notion status (never downgrade)
-         ↓
-  [MONTHLY] feedback_agent  →  classify outcomes (success / fail / stale)
-                            →  GPT-4o pattern analysis
-                            →  outreach_learnings.md  (auto-injected next copywrite)</div>
+    <div class="flow-legend">
+      <div class="flow-legend-item"><div class="flow-legend-dot" style="background:var(--node-input-border)"></div> Input / file</div>
+      <div class="flow-legend-item"><div class="flow-legend-dot" style="background:var(--node-auto-border)"></div> Automated agent</div>
+      <div class="flow-legend-item"><div class="flow-legend-dot" style="background:var(--node-manual-border)"></div> Manual step</div>
+      <div class="flow-legend-item"><div class="flow-legend-dot" style="background:var(--node-monthly-border)"></div> Monthly / maintenance</div>
+    </div>
+
+    <div class="flow-diagram">
+      <div class="pipeline">
+
+        <!-- INPUTS -->
+        <div class="stage">
+          <div class="stage-label">Inputs</div>
+          <div class="stage-nodes">
+            <div class="node node-input"><span class="node-title">Screenshots</span><span class="node-sub">data/inputs/images/new/</span></div>
+            <span class="node-plus">+</span>
+            <div class="node node-input"><span class="node-title">LinkedIn URLs</span><span class="node-sub">data/inputs/linkedin_urls/new/</span></div>
+            <span class="node-plus">+</span>
+            <div class="node node-input"><span class="node-title">Manual contacts</span><span class="node-sub">data/inputs/manual_contacts/new/</span></div>
+          </div>
+        </div>
+
+        <div class="stage-connector"><div class="connector-line"><div class="vline"></div><div class="arrow-down"></div></div></div>
+
+        <!-- COLLECT -->
+        <div class="stage">
+          <div class="stage-label">Collect</div>
+          <div class="stage-nodes">
+            <div class="node node-auto"><span class="node-title">collector</span><span class="node-sub">GPT-4o Vision + dedup</span></div>
+            <div class="hline"></div><div class="arrow-right"></div>
+            <div class="node node-file"><span class="node-title">master_input.csv</span><span class="node-sub">11 cols · status=pending</span></div>
+          </div>
+        </div>
+
+        <div class="stage-connector"><div class="connector-line"><div class="vline"></div><div class="arrow-down"></div></div></div>
+
+        <!-- RANK -->
+        <div class="stage">
+          <div class="stage-label">Rank</div>
+          <div class="stage-nodes">
+            <div class="node node-auto"><span class="node-title">ranking_agent</span><span class="node-sub">GPT-4o · score 0–10</span></div>
+          </div>
+        </div>
+
+        <div class="stage-connector"><div class="connector-line"><div class="vline"></div><div class="arrow-down"></div></div></div>
+
+        <!-- BRANCH: shortlist vs backlog -->
+        <div class="branch-wrap">
+          <div class="branch-col">
+            <div class="branch-label">score ≥ 5 · up to 25</div>
+            <div class="node node-file"><span class="node-title">qualified_leads.csv</span><span class="node-sub">with contact · no contact</span></div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+              <div class="vline" style="margin-left:0;height:16px"></div>
+            </div>
+            <div class="node node-manual"><span class="node-title">Apollo enrichment</span><span class="node-sub">manual · upload both CSVs</span></div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+              <div class="vline" style="margin-left:0;height:16px"></div>
+            </div>
+            <div class="node node-auto"><span class="node-title">upload_agent</span><span class="node-sub">Notion Accounts + Contacts</span></div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+              <div class="vline" style="margin-left:0;height:16px"></div>
+            </div>
+            <div class="node node-auto"><span class="node-title">copywriter_agent</span><span class="node-sub">4 msgs · A/B variant</span></div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+              <div class="vline" style="margin-left:0;height:16px"></div>
+            </div>
+            <div class="node node-manual"><span class="node-title">Send messages</span><span class="node-sub">LinkedIn + email</span></div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+              <div class="vline" style="margin-left:0;height:16px"></div>
+            </div>
+            <div class="node node-auto"><span class="node-title">linkedin_manager</span><span class="node-sub">follow-ups · status updates</span></div>
+          </div>
+
+          <div style="margin: 0 8px; color: #b0bac8; font-size: 22px; padding-top: 8px;">│</div>
+
+          <div class="branch-col">
+            <div class="branch-label">score &lt; 5 · or over 25-cap</div>
+            <div class="node node-file"><span class="node-title">backlog.csv</span><span class="node-sub">re-scored next rank run</span></div>
+          </div>
+        </div>
+
+        <div class="stage-connector" style="margin-top: 12px;"><div class="connector-line"><div class="vline"></div><div class="arrow-down"></div></div></div>
+
+        <!-- MONTHLY -->
+        <div class="stage">
+          <div class="stage-label">Monthly</div>
+          <div class="stage-nodes">
+            <div class="node node-monthly"><span class="node-title">feedback_agent</span><span class="node-sub">outcome analysis → outreach_learnings.md</span></div>
+            <span class="node-plus">·</span>
+            <div class="node node-monthly"><span class="node-title">supervisor</span><span class="node-sub">PDF audit · cost report</span></div>
+            <span class="node-plus">·</span>
+            <div class="node node-monthly"><span class="node-title">notion_cleanup</span><span class="node-sub">dedup · domain fill</span></div>
+          </div>
+        </div>
+
+      </div><!-- /pipeline -->
+    </div><!-- /flow-diagram -->
+
+    <p class="note" style="margin-top:16px;"><strong>Feedback loop:</strong> <code>outreach_learnings.md</code> is auto-injected into every copywriter run. Run <code>feedback_agent</code> monthly to keep it fresh.</p>
   </section>
 
   <!-- ── KEY PARAMETERS ────────────────────────────────────────────────────── -->
   <section>
-    <h2>Key Parameters — Know These Before Changing Anything</h2>
+    <h2>Key Parameters</h2>
     <div class="two-col">
       <div class="param-box">
-        <h4>Ranking Agent (<code>agents/ranking_agent.py</code>)</h4>
+        <h4>ranking_agent.py</h4>
         <table>
-          <tr><th>Parameter</th><th>Value</th><th>Where</th></tr>
-          <tr><td>Qualification threshold</td><td><code>MIN_SCORE = 5.0</code></td><td>line 799</td></tr>
-          <tr><td>Max shortlist size</td><td><code>MAX_QUALIFIED = 25</code></td><td>line 978</td></tr>
-          <tr><td>Campaign cooldown</td><td><code>CAMPAIGN_COOLDOWN_DAYS = 90</code></td><td>line 334</td></tr>
-          <tr><td>Contact bonus</td><td><code>+1</code> to score if <code>person_name</code> present (capped at 10)</td><td>line 760</td></tr>
-          <tr><td>Main scoring model</td><td><code>gpt-4o</code></td><td>line 525</td></tr>
-          <tr><td>Club verification model</td><td><code>gpt-4o-mini</code></td><td>line 191</td></tr>
-          <tr><td>Club verification trigger</td><td>Score ≥ 5 + suspicious name patterns</td><td>line 767</td></tr>
-          <tr><td>Status block threshold</td><td><code>Engaged</code> or above → blocked from shortlist</td><td>notion_client.py</td></tr>
+          <tr><th>Constant</th><th>Value</th><th>Effect</th></tr>
+          <tr><td><code>MIN_SCORE</code></td><td>5.0</td><td>Below this → backlog</td></tr>
+          <tr><td><code>MAX_QUALIFIED</code></td><td>25</td><td>Shortlist cap per run</td></tr>
+          <tr><td><code>CAMPAIGN_COOLDOWN_DAYS</code></td><td>90</td><td>Days before re-export allowed</td></tr>
+          <tr><td>Contact bonus</td><td>+1 to score</td><td>Applied when <code>person_name</code> present (capped at 10)</td></tr>
+          <tr><td>Main model</td><td><code>gpt-4o</code></td><td>Lead scoring</td></tr>
+          <tr><td>Club verify model</td><td><code>gpt-4o-mini</code></td><td>Second-pass student club check (score ≥ 5 + suspicious name)</td></tr>
+          <tr><td>Status block</td><td>≥ Engaged</td><td>Blocks company from shortlist</td></tr>
         </table>
       </div>
       <div class="param-box">
-        <h4>Collector (<code>agents/collector.py</code>)</h4>
-        <table>
-          <tr><th>Parameter</th><th>Value</th></tr>
-          <tr><td>Contacts per company cap</td><td>2 max per batch; 3rd+ → <code>archived</code></td></tr>
-          <tr><td>Dedup key</td><td><code>(domain_or_company, person_name)</code></td></tr>
-          <tr><td>Dedup fallback</td><td>company_name when domain missing</td></tr>
-          <tr><td>Vision model</td><td><code>gpt-4o</code></td></tr>
-          <tr><td>Domain verification</td><td>HTTP HEAD request, 3s timeout</td></tr>
-        </table>
-        <h4 style="margin-top:16px;">Copywriter (<code>agents/copywriter_agent.py</code>)</h4>
+        <h4>copywriter_agent.py</h4>
         <table>
           <tr><th>Parameter</th><th>Value</th></tr>
           <tr><td>LinkedIn cold max</td><td>75 words</td></tr>
           <tr><td>LinkedIn follow-up max</td><td>60 words</td></tr>
-          <tr><td>Cold email max</td><td>100 words body; 8 words subject</td></tr>
-          <tr><td>Email subject format</td><td><code>COMPANY || TUM Social AI: TRIGGER_TOPIC</code></td></tr>
-          <tr><td>A/B variants</td><td>A = concise partner mention; B = impact scale framing</td></tr>
-          <tr><td>Careers fetch</td><td>Only for talent/HR/founder/CEO-type contacts</td></tr>
+          <tr><td>Cold email body max</td><td>100 words</td></tr>
+          <tr><td>Email subject format</td><td><code>COMPANY ‖ TUM Social AI: TRIGGER</code></td></tr>
+          <tr><td>A/B split</td><td>50/50 random per contact, stored in Notion</td></tr>
+          <tr><td>Careers page fetch</td><td>Only for talent/HR/founder/C-suite contacts</td></tr>
         </table>
-      </div>
-    </div>
-    <div class="param-box" style="margin-top:14px;">
-      <h4>Notion Status Hierarchy (never downgrade)</h4>
-      <p style="margin:4px 0 8px;font-size:13px;color:var(--muted);">Status index ≥ 7 (Engaged and above) blocks a company from appearing on the campaign shortlist. The 16-level hierarchy is defined in <code>agents/notion_cleanup.py</code> (<code>STATUS_HIERARCHY</code>).</p>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;">
-        <span class="tag tag-gray">1 · New Lead</span>
-        <span class="tag tag-gray">2 · Collected</span>
-        <span class="tag tag-gray">3 · Qualified</span>
-        <span class="tag tag-gray">4 · Apollo Enriched</span>
-        <span class="tag tag-gray">5 · Outreach Ready</span>
-        <span class="tag tag-gray">6 · Contacted</span>
-        <span class="tag tag-gray">7 · Engaged ←block threshold</span>
-        <span class="tag tag-green">8 · Meeting Scheduled</span>
-        <span class="tag tag-green">9 · Meeting Done</span>
-        <span class="tag tag-green">10 · Proposal Sent</span>
-        <span class="tag tag-green">11 · Negotiating</span>
-        <span class="tag tag-green">12 · Partner</span>
-        <span class="tag tag-red">Unqualified</span>
-        <span class="tag tag-yellow">Nurture</span>
-        <span class="tag tag-yellow">Ghost</span>
+        <h4>Notion status hierarchy (16 levels)</h4>
+        <p style="font-size:12.5px;margin:4px 0;">Status index ≥ 7 (<strong>Engaged</strong>) blocks re-export. Defined in <code>notion_cleanup.py → STATUS_HIERARCHY</code>. Status is never downgraded.</p>
       </div>
     </div>
   </section>
 
-  <!-- ── SCORING CRITERIA ─────────────────────────────────────────────────── -->
+  <!-- ── SCORING LOGIC ──────────────────────────────────────────────────────── -->
   <section>
-    <h2>Scoring Criteria (Ranking Agent)</h2>
-    <p>GPT-4o receives the full <code>SCORING_PROMPT</code> (defined in <code>ranking_agent.py</code>) and returns a <code>LeadScore</code> Pydantic model: <code>score (0–10 float)</code>, <code>reasoning (str)</code>, <code>red_flags (List[str])</code>. The prompt is structured as follows:</p>
+    <h2>Scoring Logic (ranking_agent)</h2>
+    <p>GPT-4o receives <code>SCORING_PROMPT</code> and returns a Pydantic <code>LeadScore</code>: <code>score (0–10 float)</code>, <code>reasoning</code>, <code>red_flags</code>. Prompt lives entirely in <code>agents/ranking_agent.py</code> — plain text, no recompile needed to edit.</p>
 
-    <h3>1. Pipeline Success Context (dynamic, strongest signal)</h3>
-    <p>Before each scoring run, <code>build_pipeline_success_section()</code> fetches companies from Notion Accounts that are in Workflow campaigns and have reached <strong>Engaged or further</strong>. These are injected into the prompt as proven lookalikes. Companies similar to these get <strong>+1 to +2 bonus</strong> mentioned in the prompt.</p>
+    <h3>Pipeline success context (strongest signal)</h3>
+    <p>Before each run, <code>build_pipeline_success_section()</code> fetches Notion Accounts from Workflow campaigns at <strong>Engaged+</strong> and injects them as lookalikes. Companies resembling these get a <strong>+1 to +2 prompt boost</strong>. As the pipeline matures this signal automatically improves.</p>
 
-    <h3>2. ICP — High Score (8–10)</h3>
-    <ul>
-      <li>Strong social, humanitarian, ecological, or innovation mission aligned with AI for Good</li>
-      <li>AI companies and tech scale-ups (Series A+) engaging with student ecosystems</li>
-      <li>Social impact organizations using or needing AI</li>
-      <li>Large corporates with AI initiatives and CSR programs</li>
-      <li>Innovation hubs, accelerators, tech ecosystems</li>
-      <li>NGOs, foundations, humanitarian organizations</li>
-      <li>Companies collaborating with student organizations (strong conversion signal)</li>
-      <li>VCs with explicit social impact / climate tech / sustainability focus</li>
-    </ul>
-
-    <h3>3. ICP — Medium Score (5–7)</h3>
-    <ul>
-      <li>Tech companies without clear AI focus but innovation-driven</li>
-      <li>Consulting firms with AI/tech practice</li>
-      <li>Research institutions and universities</li>
-      <li>Government digital/innovation agencies</li>
-      <li>Series A startups with clear AI application</li>
-      <li>Early-stage AI startups in accelerators/hackathons</li>
-      <li>General VCs with AI/tech focus but no explicit social/climate angle</li>
-    </ul>
-
-    <h3>4. ICP — Low Score (1–4)</h3>
-    <ul>
-      <li>Weak AI/impact connection</li>
-      <li>Traditional industries without innovation angle</li>
-      <li>B2C consumer companies without tech focus</li>
-      <li>Pure fintech/crypto VCs with no social angle</li>
-    </ul>
-
-    <h3>5. Automatic Disqualification (Score = 0)</h3>
-    <p class="warn note">These checks run <em>before</em> GPT-4o to save API costs. The two-step student club guard (rule-based → LLM verification) catches borderline cases.</p>
+    <h3>Score tiers</h3>
     <table>
-      <thead><tr><th>Check</th><th>Method</th><th>Examples</th></tr></thead>
+      <thead><tr><th>Score</th><th>Profile</th></tr></thead>
       <tbody>
-        <tr><td>Company blocklist</td><td><code>is_blocklisted()</code> — string match against <code>COMPANY_BLOCKLIST</code> in <code>utils/config.py</code></td><td>Own organization, known false positives</td></tr>
-        <tr><td>Student club (fast)</td><td><code>is_student_club()</code> — exact match against <code>STUDENT_CLUB_BLOCKLIST</code> + 16 pattern strings + e.V. + university context</td><td>Enactus, AIESEC, bonding, thinc!, 180 Degrees, any Hochschulgruppe</td></tr>
-        <tr><td>Student club (LLM verify)</td><td><code>_verify_student_club_with_llm()</code> using <code>gpt-4o-mini</code> — only called if score ≥ 5 AND name has suspicious patterns</td><td>Borderline "e.V." + student/alumni/initiative combinations</td></tr>
-        <tr><td>Via GPT-4o prompt</td><td>Listed as red flags in <code>SCORING_PROMPT</code></td><td>Pre-seed startups, crypto/gambling/tobacco/weapons/defense, catering/events/videography</td></tr>
+        <tr><td><span class="tag tag-green">8–10</span></td><td>Social/humanitarian/ecological mission + AI fit; impact VCs (climate/sustainability focus); orgs collaborating with student ecosystems; innovation hubs; similar to proven pipeline wins</td></tr>
+        <tr><td><span class="tag tag-yellow">5–7</span></td><td>Tech without clear AI; consulting with AI practice; research institutions; government digital agencies; Series A AI startups; early-stage in accelerators</td></tr>
+        <tr><td><span class="tag" style="background:#fee2e2;color:#7f1d1d;">1–4</span></td><td>Weak AI/impact connection; traditional industry; B2C consumer; pure fintech/crypto VCs</td></tr>
+        <tr><td><span class="tag tag-gray">0</span></td><td>Auto-disqualified (see below) — GPT-4o call skipped</td></tr>
       </tbody>
     </table>
-    <p class="note"><strong>DACH note:</strong> DACH presence is only a minor tiebreaker. International organizations are not penalized. Never add DACH as a primary filter.</p>
+    <p class="note"><strong>DACH note:</strong> DACH presence is a minor tiebreaker only. International organizations are not penalized. Never add it as a primary filter.</p>
+
+    <h3>Auto-disqualification (GPT-4o skipped entirely)</h3>
+    <table>
+      <thead><tr><th>Check</th><th>How</th><th>Examples</th></tr></thead>
+      <tbody>
+        <tr><td>Company blocklist</td><td><code>is_blocklisted()</code> — string match vs <code>COMPANY_BLOCKLIST</code> in <code>utils/config.py</code></td><td>Own org, known false positives</td></tr>
+        <tr><td>Student club — fast</td><td><code>is_student_club()</code> — 30+ exact names + 16 pattern strings + e.V. + university-context heuristics</td><td>Enactus, AIESEC, bonding, thinc!, 180 Degrees, any Hochschulgruppe</td></tr>
+        <tr><td>Student club — LLM verify</td><td><code>gpt-4o-mini</code> YES/NO — only called when score ≥ 5 AND name has suspicious patterns</td><td>Borderline e.V. + student/alumni/initiative combos</td></tr>
+        <tr><td>GPT-4o red flags</td><td>Listed in <code>SCORING_PROMPT</code></td><td>Pre-seed, crypto/gambling/tobacco/weapons/defense, catering/events</td></tr>
+      </tbody>
+    </table>
   </section>
 
-  <!-- ── A/B TESTING ─────────────────────────────────────────────────────── -->
+  <!-- ── A/B TESTING ────────────────────────────────────────────────────────── -->
   <section>
-    <h2>A/B Testing (Copywriter Agent)</h2>
-    <p>Each contact is randomly assigned variant A or B (50/50, <code>random.choice(["A", "B"])</code>). The variant is stored in Notion's <code>AB Variant</code> select property and persisted across runs.</p>
+    <h2>A/B Test Variants</h2>
+    <p>Assigned via <code>random.choice(["A", "B"])</code> per contact, stored in Notion <code>AB Variant</code> property. The variant text is injected into the copywriter system prompt.</p>
     <div class="two-col">
       <div class="param-box">
-        <strong>Variant A — Concise Partner Mention</strong>
-        <p style="font-size:13px;margin-top:6px;color:var(--muted);">Framing injected into system prompt:</p>
-        <blockquote style="border-left:3px solid var(--accent);margin:8px 0;padding:6px 12px;font-size:13px;color:var(--ink);">"We're developing AI solutions with partners like UN Women"</blockquote>
-        <p style="font-size:13px;color:var(--muted);">Understated. Let the partner name do the heavy lifting.</p>
+        <strong>Variant A — Concise partner mention</strong>
+        <blockquote style="border-left:3px solid var(--accent);margin:8px 0;padding:6px 10px;font-size:13px;">"We're developing AI solutions with partners like UN Women"</blockquote>
+        <p style="font-size:12.5px;color:var(--muted);margin:0;">Understated. Let the partner name carry the weight.</p>
       </div>
       <div class="param-box">
-        <strong>Variant B — Impact Scale Framing</strong>
-        <p style="font-size:13px;margin-top:6px;color:var(--muted);">Framing injected into system prompt:</p>
-        <blockquote style="border-left:3px solid var(--accent-2);margin:8px 0;padding:6px 12px;font-size:13px;color:var(--ink);">"We're multiplying the impact of our non-profit partners like UN Women in over 50 countries through custom AI tools"</blockquote>
-        <p style="font-size:13px;color:var(--muted);">Emphasize scale and tangible reach. Make the reader feel it.</p>
+        <strong>Variant B — Impact scale framing</strong>
+        <blockquote style="border-left:3px solid var(--accent-2);margin:8px 0;padding:6px 10px;font-size:13px;">"We're multiplying the impact of our non-profit partners like UN Women in over 50 countries through custom AI tools"</blockquote>
+        <p style="font-size:12.5px;color:var(--muted);margin:0;">Scale and tangible reach. Make the reader feel it.</p>
       </div>
     </div>
-    <p>The <strong>feedback agent</strong> evaluates A/B results monthly: it classifies outcomes (success = status ≥ Engaged; failure = Unqualified or stale 30+ days), runs GPT-4o pattern analysis across both variants, and writes findings to <code>data/prompts/outreach_learnings.md</code>.</p>
+    <p>The <strong>feedback agent</strong> evaluates A/B results monthly, classifies outcomes (success = status ≥ Engaged; failure = Unqualified or stale 30+ days), and writes findings to <code>data/prompts/outreach_learnings.md</code>.</p>
   </section>
 
-  <!-- ── AGENT REFERENCE TABLE ─────────────────────────────────────────────── -->
+  <!-- ── HOW TO MAKE CHANGES ──────────────────────────────────────────────── -->
   <section>
-    <h2>Agent Reference Table</h2>
+    <h2>How to Make Changes</h2>
+    <p>Always test with <code>--dry-run</code> first. For prompt changes, validate on a batch of 10–20 known leads and compare scores.</p>
+
+    <h3>Change the score threshold or shortlist size</h3>
+    <pre><code># agents/ranking_agent.py  ~line 799
+MIN_SCORE = 5.0       # lower to 4.0 if pipeline is thin
+MAX_QUALIFIED = 25    # raise if you want a larger Apollo batch</code></pre>
+
+    <h3>Add a company to the permanent blocklist</h3>
+    <p>Open <code>utils/config.py</code>, add to <code>COMPANY_BLOCKLIST</code> (lowercase, partial match). GPT-4o call is skipped entirely for blocklisted companies.</p>
+
+    <h3>Add a student club to the fast-filter</h3>
+    <p>Add the name (lowercase) to <code>STUDENT_CLUB_BLOCKLIST</code> (line 68) or a pattern to <code>STUDENT_CLUB_PATTERNS</code> (line 92) in <code>ranking_agent.py</code>.</p>
+
+    <h3>Change ICP definition or scoring criteria</h3>
+    <p>Edit <code>SCORING_PROMPT</code> in <code>ranking_agent.py</code> (line 223). Plain text — no Python changes. Key sections: <strong>HIGH/MEDIUM/LOW SCORE</strong>, <strong>POSITIVE SIGNALS</strong>, <strong>AUTOMATIC DISQUALIFICATION</strong>.</p>
+
+    <h3>Change the campaign cooldown</h3>
+    <pre><code># agents/ranking_agent.py  ~line 334
+CAMPAIGN_COOLDOWN_DAYS = 90  # days before same company can re-enter shortlist</code></pre>
+
+    <h3>Change outreach message style or length</h3>
+    <p>Style lives in <code>data/prompts/outreach_skill.md</code> — edit the file directly, no Python needed. Length limits are in the Pydantic field <code>description</code> strings inside <code>class OutreachMessages</code> in <code>copywriter_agent.py</code>.</p>
+
+    <h3>Change A/B variants</h3>
+    <p>Edit <code>VARIANT_ADDENDA</code> dict in <code>copywriter_agent.py</code> (line 79). Add a variant C by extending the dict and changing <code>assign_variant()</code> to <code>random.choice(["A","B","C"])</code>.</p>
+
+    <h3>Add a new input source</h3>
+    <p>Add a folder under <code>data/inputs/</code>, write a parser function in <code>collector.py</code>, register it in the main aggregation loop. Each stream must produce rows matching the 11-column master CSV schema in <code>utils/config.py</code>.</p>
+
+    <h3>Add a new Notion property</h3>
+    <p>Edit the properties dict in <code>utils/notion_client.py</code> before the Notion API call. Re-run <code>cleanup --domains</code> to backfill existing records.</p>
+
+    <h3>Improve the feedback / learnings loop</h3>
+    <p>Add weak vs improved examples to the Notion Copywriter Improvement Log, then run <code>python agent.py feedback</code>. Or append directly to <code>data/prompts/outreach_learnings.md</code> — it's auto-injected on every <code>copywrite</code> run via <code>load_learnings_prompt()</code>.</p>
+  </section>
+
+  <!-- ── CSV SCHEMA ─────────────────────────────────────────────────────────── -->
+  <section>
+    <h2>master_input.csv Schema</h2>
+    <p>All 11 columns must be present. The collector enforces this. Any external CSV merged in must be mapped first.</p>
     <table>
-      <thead><tr><th>Agent</th><th>Command</th><th>Input</th><th>Output</th><th>Model</th></tr></thead>
+      <thead><tr><th>Column</th><th>Notes</th></tr></thead>
       <tbody>
-        <tr>
-          <td><code>collector</code></td>
-          <td><code>python agent.py collect</code></td>
-          <td><code>data/inputs/images/new/</code>, <code>linkedin_urls/new/</code>, <code>manual_contacts/new/</code></td>
-          <td>Rows appended to <code>master_input.csv</code>; inputs moved to <code>processed/</code></td>
-          <td>gpt-4o (Vision + extraction)</td>
-        </tr>
-        <tr>
-          <td><code>ranking_agent</code></td>
-          <td><code>python agent.py rank</code></td>
-          <td><code>master_input.csv</code> (pending + backlog rows)</td>
-          <td><code>weekly_qualified_leads_with_contacts.csv</code>, <code>weekly_qualified_leads_no_contact.csv</code>, email report</td>
-          <td>gpt-4o + gpt-4o-mini (club verification)</td>
-        </tr>
-        <tr>
-          <td><code>upload_agent</code></td>
-          <td><code>python agent.py upload --csv apollo.csv --sender "Full Name"</code></td>
-          <td>Apollo-enriched CSV + sender name</td>
-          <td>Notion Accounts + Contacts DB rows created/updated</td>
-          <td>None (API only)</td>
-        </tr>
-        <tr>
-          <td><code>copywriter_agent</code></td>
-          <td><code>python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code></td>
-          <td>Notion Contacts with missing messages; optionally careers page content</td>
-          <td>4 messages per contact written to Notion; A/B variant stored</td>
-          <td>gpt-4o</td>
-        </tr>
-        <tr>
-          <td><code>linkedin_manager</code></td>
-          <td><code>python agent.py linkedin --connections-file "network.html"</code></td>
-          <td>Saved LinkedIn HTML + Notion contacts</td>
-          <td>Follow-up drafts in Notion; status updates; PDF report</td>
-          <td>gpt-4o (sentiment + drafts)</td>
-        </tr>
-        <tr>
-          <td><code>feedback_agent</code></td>
-          <td><code>python agent.py feedback</code></td>
-          <td>Notion Contacts + Accounts (outcome statuses)</td>
-          <td><code>data/prompts/outreach_learnings.md</code> updated</td>
-          <td>gpt-4o</td>
-        </tr>
-        <tr>
-          <td><code>supervisor</code></td>
-          <td><code>python agent.py supervisor</code></td>
-          <td><code>data/logs/api_usage.jsonl</code> + all CSVs</td>
-          <td>Weekly PDF audit report in <code>data/reports/</code></td>
-          <td>None (data aggregation)</td>
-        </tr>
-        <tr>
-          <td><code>notion_cleanup</code></td>
-          <td><code>python agent.py cleanup --all</code></td>
-          <td>Notion Accounts DB</td>
-          <td>Phase 1: auto-populate missing domains/types. Phase 2: interactive domain-based duplicate merge.</td>
-          <td>gpt-4o (domain inference)</td>
-        </tr>
+        <tr><td><code>date_added</code></td><td>YYYY-MM-DD, set at ingest</td></tr>
+        <tr><td><code>company_name</code></td><td>Primary dedup fallback when domain missing</td></tr>
+        <tr><td><code>company_domain</code></td><td>Primary dedup key; verified via HTTP HEAD</td></tr>
+        <tr><td><code>person_name</code></td><td>Optional. Presence triggers +1 score bonus.</td></tr>
+        <tr><td><code>linkedin_url_contact</code></td><td>Contact-level dedup in Notion</td></tr>
+        <tr><td><code>linkedin_url_post</code></td><td>Source of the trigger signal</td></tr>
+        <tr><td><code>trigger</code></td><td>Why to reach out now — event, hiring, funding, etc.</td></tr>
+        <tr><td><code>score</code></td><td>Float 0–10, set by ranking_agent</td></tr>
+        <tr><td><code>reasoning</code></td><td>GPT-4o reasoning text</td></tr>
+        <tr><td><code>source</code></td><td><code>manual_screenshot</code> · <code>linkedin_post</code> · <code>manual_contact</code></td></tr>
+        <tr><td><code>status</code></td><td><code>pending</code> → <code>qualified_for_apollo</code> | <code>requalified</code> | <code>backlog</code> | <code>filtered_out</code> | <code>duplicate_in_notion</code> | <code>archived</code> | <code>exported_previously</code></td></tr>
       </tbody>
     </table>
   </section>
 
-  <!-- ── SETUP ──────────────────────────────────────────────────────────── -->
+  <!-- ── COST REFERENCE ────────────────────────────────────────────────────── -->
   <section>
-    <h2>Setup</h2>
-    <h3>macOS / Linux</h3>
-    <pre><code>git clone https://github.com/tumsocialai/strategic-partnerships.git
-cd strategic-partnerships
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.template .env   # fill in API keys</code></pre>
-    <h3>Windows PowerShell</h3>
-    <pre><code>git clone https://github.com/tumsocialai/strategic-partnerships.git
-cd strategic-partnerships
-py -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-copy .env.template .env</code></pre>
-    <h3>Required environment variables</h3>
-    <pre><code>OPENAI_API_KEY=sk-...
-NOTION_TOKEN=secret_...
-NOTION_DB_ACCOUNTS_ID=&lt;32-char UUID without dashes&gt;
-NOTION_DB_CONTACTS_ID=&lt;32-char UUID without dashes&gt;
-NOTION_DB_QUALIFIED_ID=&lt;32-char UUID without dashes&gt;
-
-# Optional: email reports
-GMAIL_ADDRESS=you@gmail.com
-GMAIL_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
-REPORT_RECIPIENT_EMAIL=team@tumsocialai.com
-RANKING_REPORT_RECIPIENTS=person1@x.com,person2@x.com  # overrides above
-
-# Optional: default sender for copywriter
-DEFAULT_CAMPAIGN_SENDER=Your Full Name</code></pre>
-    <p class="warn note">The Contacts DB must be explicitly shared with the Notion integration. A correct DB ID still returns 404 if the integration has not been invited. In Notion: open the database → Share → invite the integration by name.</p>
-  </section>
-
-  <!-- ── COMMAND SEQUENCE ───────────────────────────────────────────────── -->
-  <section>
-    <h2>Campaign Command Sequence</h2>
+    <h2>API Cost Reference</h2>
+    <p>Every call is logged to <code>data/logs/api_usage.jsonl</code>. Supervisor parses this weekly for the PDF report.</p>
     <table>
-      <thead><tr><th>Step</th><th>Command</th><th>Notes</th></tr></thead>
+      <thead><tr><th>Operation</th><th>Model</th><th>Typical cost</th></tr></thead>
       <tbody>
-        <tr><td>1. Process inputs</td><td><code>python agent.py collect</code></td><td>Run after dropping new screenshots/URLs/contacts into <code>data/inputs/*/new/</code></td></tr>
-        <tr><td>2. Create shortlist</td><td><code>python agent.py rank</code></td><td>Scores all pending + backlog. Outputs 2 CSVs + email report.</td></tr>
-        <tr><td>3. Apollo enrichment</td><td><em>(manual in Apollo)</em></td><td>Upload both shortlist CSVs to Apollo. Export enriched CSV.</td></tr>
-        <tr><td>4. Upload to Notion</td><td><code>python agent.py upload --csv "apollo.csv" --sender "Full Name"</code></td><td>Creates/updates Accounts + Contacts. Tags campaign sender.</td></tr>
-        <tr><td>5. Generate outreach</td><td><code>python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code></td><td>Writes 4 messages to each contact's Notion page. Assigns A/B variant.</td></tr>
-        <tr><td>6. LinkedIn review</td><td><code>python agent.py linkedin --connections-file "network.html"</code></td><td>Run after saving LinkedIn connections page (Cmd+S). Updates Notion statuses.</td></tr>
-        <tr><td>7. Monthly feedback</td><td><code>python agent.py feedback</code></td><td>Run monthly. Updates <code>outreach_learnings.md</code> for next copywrite run.</td></tr>
-        <tr><td>Maintenance</td><td><code>python agent.py supervisor</code> / <code>python agent.py cleanup --all</code></td><td>Weekly audit report / Notion dedup + domain auto-fill</td></tr>
+        <tr><td>Score 50 leads</td><td>gpt-4o</td><td>~$0.30–0.50</td></tr>
+        <tr><td>Copywrite 15 contacts</td><td>gpt-4o</td><td>~$0.20–0.40</td></tr>
+        <tr><td>Student club verification (per check)</td><td>gpt-4o-mini</td><td>&lt;$0.01</td></tr>
+        <tr><td>Building / modifying agents (Claude Code or Codex)</td><td>varies</td><td>10–50× higher than running agents</td></tr>
       </tbody>
     </table>
-    <p class="note">Useful flags: append <code>--dry-run</code> to any agent to preview output without writing. <code>--force</code> on copywriter overwrites existing messages.</p>
-  </section>
-
-  <!-- ── CALENDAR CADENCE ───────────────────────────────────────────────── -->
-  <section>
-    <h2>Calendar Cadence</h2>
-    <table>
-      <thead><tr><th>Cadence</th><th>Block duration</th><th>Action</th></tr></thead>
-      <tbody>
-        <tr><td>Continuous</td><td>Ongoing</td><td>Save LinkedIn screenshots, URLs, and manual contacts. The collector can run in <code>--watch</code> mode if you want instant processing.</td></tr>
-        <tr><td>On campaign start</td><td>45 min</td><td>Run <code>collect</code>, review inputs, run <code>rank</code>, review shortlist, do Apollo enrichment.</td></tr>
-        <tr><td>After Apollo</td><td>30 min</td><td>Run <code>upload</code> + <code>copywrite</code>. Review generated messages in Notion before sending.</td></tr>
-        <tr><td>During campaign</td><td>20 min/week</td><td>Run <code>linkedin</code> after saving connections HTML. Send first messages and follow-ups.</td></tr>
-        <tr><td>Monthly</td><td>30 min</td><td>Run <code>feedback</code>. Review campaigns. Move learning examples to improvement log.</td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <!-- ── HOW TO MAKE CHANGES ────────────────────────────────────────────── -->
-  <section>
-    <h2>How to Make Changes or Improvements</h2>
-    <p>This section is the guide for anyone who wants to tune the system. Always test with <code>--dry-run</code> first on a small batch.</p>
-
-    <h3>Changing the scoring threshold or shortlist size</h3>
-    <p>Open <code>agents/ranking_agent.py</code>. Find the two constants near line 799:</p>
-    <pre><code>MIN_SCORE = 5.0       # leads below this go to backlog
-MAX_QUALIFIED = 25    # shortlist cap per run</code></pre>
-    <p>Lower <code>MIN_SCORE</code> to 4.0 if the pipeline is thin. Raise <code>MAX_QUALIFIED</code> if you want a larger Apollo batch. After changing, re-run <code>python agent.py rank</code> — existing leads in backlog will be re-scored.</p>
-
-    <h3>Adding a company to the permanent blocklist</h3>
-    <p>Open <code>utils/config.py</code>. Find <code>COMPANY_BLOCKLIST</code> and add the new string (lowercase, partial match is fine). This skips GPT-4o entirely for that company.</p>
-
-    <h3>Adding a student club to the fast-filter</h3>
-    <p>Open <code>agents/ranking_agent.py</code>. Add the exact name (lowercase) to <code>STUDENT_CLUB_BLOCKLIST</code> (line 68) or a pattern to <code>STUDENT_CLUB_PATTERNS</code> (line 92). If it's a common edge case, also add context to the <code>SCORING_PROMPT</code> examples section.</p>
-
-    <h3>Changing scoring criteria or ICP definition</h3>
-    <p>Edit <code>SCORING_PROMPT</code> in <code>agents/ranking_agent.py</code> (line 223). The prompt is plain text — no code changes needed. Key sections to modify:</p>
-    <ul>
-      <li><strong>HIGH/MEDIUM/LOW SCORE</strong> sections — add or remove bullet points</li>
-      <li><strong>POSITIVE SIGNALS</strong> — add new boost signals</li>
-      <li><strong>AUTOMATIC DISQUALIFICATION</strong> — add industry/type red flags</li>
-    </ul>
-    <p class="info note">After editing the prompt, re-run ranking on a batch of 10–20 known leads and compare the new scores to previous ones to validate the change.</p>
-
-    <h3>Changing the campaign cooldown window</h3>
-    <p>Change <code>CAMPAIGN_COOLDOWN_DAYS = 90</code> (line 334 in <code>ranking_agent.py</code>). This controls how long before a previously exported company can re-enter the shortlist. 90 days = ~3 months between campaigns on the same company.</p>
-
-    <h3>Changing outreach message style or length</h3>
-    <p>The full outreach brief lives in <code>data/prompts/outreach_skill.md</code>. Edit that file — no Python changes needed. Changes take effect immediately on the next <code>copywrite</code> run.</p>
-    <p>To change message length limits, edit the Pydantic field descriptions in <code>class OutreachMessages</code> (line 95, <code>agents/copywriter_agent.py</code>):</p>
-    <pre><code>linkedin_first_cold: str = Field(description="... Max 75 words ...")
-linkedin_follow_up:  str = Field(description="... Max 60 words ...")
-cold_email_body:     str = Field(description="... Max 100 words ...")</code></pre>
-
-    <h3>Changing the A/B test variants</h3>
-    <p>Edit <code>VARIANT_ADDENDA</code> dict in <code>agents/copywriter_agent.py</code> (line 79). Each key is <code>"A"</code> or <code>"B"</code>, each value is a text block injected into the system prompt. You can add variant C by extending the dict and updating <code>assign_variant()</code> to use <code>random.choice(["A", "B", "C"])</code>.</p>
-
-    <h3>Changing LinkedIn follow-up timing thresholds</h3>
-    <p>Open <code>agents/linkedin_manager.py</code>. Look for the constants that define the follow-up window (3–5 days) and the ghost/nurture window. Update them and re-run with the saved HTML.</p>
-
-    <h3>Adding a new input source to the collector</h3>
-    <p>Open <code>agents/collector.py</code>. There are three clearly separated stream sections (screenshots, LinkedIn URLs, manual contacts). Add a new folder under <code>data/inputs/</code>, create a parser function, and register it in the main aggregation loop. Follow the existing pattern — each stream writes to the same 11-column <code>master_input.csv</code> schema defined in <code>utils/config.py</code>.</p>
-
-    <h3>Adding a new Notion property to the upload</h3>
-    <p>Open <code>utils/notion_client.py</code>. The <code>upload_agent</code> builds a properties dict before each Notion API call. Add your new field there. Then run <code>python agent.py cleanup --domains</code> to backfill existing records if needed.</p>
-
-    <h3>Improving the feedback/learnings loop</h3>
-    <p>Add real examples of weak vs. improved messages to the Notion Copywriter Improvement Log (toggle under Partnerships Agents page). Once you've collected 5+ good examples, run <code>python agent.py feedback</code> — it will distill new learnings into <code>data/prompts/outreach_learnings.md</code>. These are auto-injected the next time you run <code>copywrite</code>.</p>
-    <p>To manually add a learning without running the feedback agent, just append to <code>data/prompts/outreach_learnings.md</code> directly.</p>
-  </section>
-
-  <!-- ── AUTOMATION POLICY ──────────────────────────────────────────────── -->
-  <section>
-    <h2>Automation Policy</h2>
-    <p><strong>Scheduled (launchd, runs automatically):</strong> <code>collector</code> (Mon/Wed/Fri 9am), <code>notion_cleanup --all</code> (1st & 15th 10am), <code>feedback_agent</code> (1st of month 11am), supervisor (Sat 9am).</p>
-    <p><strong>On demand only:</strong> <code>rank</code>, <code>upload</code>, <code>copywrite</code>, <code>linkedin</code>.</p>
-    <p class="warn note">Never run <code>ranking_agent</code> on a schedule. It emails the team and tags leads as qualified — this should always happen because someone deliberately asked for a new campaign, not on a timer.</p>
-  </section>
-
-  <!-- ── COST TRACKING ─────────────────────────────────────────────────── -->
-  <section>
-    <h2>API Cost Tracking</h2>
-    <p>Every OpenAI call is logged to <code>data/logs/api_usage.jsonl</code> via <code>utils/api_logger.py</code>. The supervisor agent parses this file weekly and includes cost breakdown in the PDF audit report.</p>
-    <table>
-      <thead><tr><th>Model</th><th>Input</th><th>Output</th><th>Typical per-run cost</th></tr></thead>
-      <tbody>
-        <tr><td>gpt-4o</td><td>$2.50/1M tokens</td><td>$10/1M tokens</td><td>Ranking 50 leads: ~$0.30–0.50; Copywriting 15 contacts: ~$0.20–0.40</td></tr>
-        <tr><td>gpt-4o-mini</td><td>$0.15/1M tokens</td><td>$0.60/1M tokens</td><td>Student club verification: &lt;$0.01 per check</td></tr>
-      </tbody>
-    </table>
-    <p class="note">Running existing agents is cheap. The big cost multiplier is using Claude Code or Codex to <em>build</em> or <em>change</em> agents, since the coding environment also uses model calls for editing and testing.</p>
-  </section>
-
-  <!-- ── CSV SCHEMA ────────────────────────────────────────────────────── -->
-  <section>
-    <h2>CSV Schema Reference (<code>master_input.csv</code>)</h2>
-    <p>All 11 columns must be present. The collector enforces this. Any external CSV merged in must be mapped to these headers first.</p>
-    <table>
-      <thead><tr><th>Column</th><th>Type</th><th>Notes</th></tr></thead>
-      <tbody>
-        <tr><td><code>date_added</code></td><td>YYYY-MM-DD</td><td>Set by collector at ingest time</td></tr>
-        <tr><td><code>company_name</code></td><td>string</td><td>Primary dedup key fallback when domain is missing</td></tr>
-        <tr><td><code>company_domain</code></td><td>string</td><td>Primary dedup key; verified via HTTP HEAD</td></tr>
-        <tr><td><code>person_name</code></td><td>string</td><td>Optional. Presence triggers +1 score bonus.</td></tr>
-        <tr><td><code>linkedin_url_contact</code></td><td>URL</td><td>Used for contact-level dedup in Notion</td></tr>
-        <tr><td><code>linkedin_url_post</code></td><td>URL</td><td>Source of the lead trigger (post or profile)</td></tr>
-        <tr><td><code>trigger</code></td><td>string</td><td>Why to reach out now — event, hiring, funding, etc.</td></tr>
-        <tr><td><code>score</code></td><td>float 0–10</td><td>Set by ranking_agent after scoring</td></tr>
-        <tr><td><code>reasoning</code></td><td>string</td><td>GPT-4o reasoning text</td></tr>
-        <tr><td><code>source</code></td><td>enum</td><td><code>manual_screenshot</code> | <code>linkedin_post</code> | <code>manual_contact</code></td></tr>
-        <tr><td><code>status</code></td><td>enum</td><td><code>pending</code> → <code>qualified_for_apollo</code> | <code>requalified</code> | <code>backlog</code> | <code>filtered_out</code> | <code>duplicate_in_notion</code> | <code>archived</code> | <code>exported_previously</code></td></tr>
-      </tbody>
-    </table>
-  </section>
-
-  <!-- ── IMPROVEMENT LOG ───────────────────────────────────────────────── -->
-  <section>
-    <h2>Copywriter Improvement Log</h2>
-    <p>Use the Notion toggle log under the Partnerships Agents page. Each entry should include:</p>
-    <ul>
-      <li>The weak snippet (bad example)</li>
-      <li>An improved version</li>
-      <li>The reason it was bad (too long, too generic, hallucinated fact, wrong tone, etc.)</li>
-      <li>Campaign and contact context</li>
-    </ul>
-    <p>Once you have 3–5 examples, move processed learnings into <code>data/prompts/outreach_learnings.md</code> — either manually or by running <code>python agent.py feedback</code>. The copywriter auto-injects this file on the next run via <code>load_learnings_prompt()</code> in <code>agents/copywriter_agent.py</code>.</p>
   </section>
 
 </main>
