@@ -703,6 +703,7 @@ def create_contact_in_notion(
     job_title: str = "",
     phone: str = "",
     apollo_contact_id: str = "",
+    campaign_sender: str = "",
     database_id: Optional[str] = None,
     prop_map: Optional[dict] = None,
 ) -> bool:
@@ -777,6 +778,9 @@ def create_contact_in_notion(
         if apollo_contact_id and apollo_contact_id != "nan":
             properties[_p("Apollo Contact ID", prop_map)] = {"rich_text": [{"text": {"content": apollo_contact_id}}]}
 
+        if campaign_sender and campaign_sender != "nan":
+            properties[_p("Campaign Sender", prop_map)] = {"rich_text": [{"text": {"content": campaign_sender}}]}
+
         resp = http_requests.post(
             "https://api.notion.com/v1/pages",
             headers=headers,
@@ -826,11 +830,23 @@ def ensure_notion_properties(accounts_db_id: str, contacts_db_id: str) -> bool:
         "Funding Amount": {"number": {"format": "number"}},
         "Lead Score": {"number": {"format": "number"}},
         "Company LinkedIn": {"url": {}},
+        "Campaign Sender": {"rich_text": {}},
+        "[Suspect] Contact Name": {"rich_text": {}},
+        "[Suspect] Contact LinkedIn URL": {"url": {}},
+        "[Suspect] Contact Email": {"rich_text": {}},
+        "[Suspect] Job Title": {"rich_text": {}},
+        "[Suspect] Contact Phone": {"rich_text": {}},
+        "LinkedIn 1st Cold": {"rich_text": {}},
+        "LinkedIn FU message": {"rich_text": {}},
+        "Cold Email Body": {"rich_text": {}},
+        "Cold Email Subject Text": {"rich_text": {}},
+        "AB Variant": {"select": {"options": [{"name": "A"}, {"name": "B"}]}},
     }
 
     # Contacts DB — new properties
     contacts_props = {
         "Apollo Contact ID": {"rich_text": {}},
+        "Campaign Sender": {"rich_text": {}},
     }
 
     success = True
@@ -1047,6 +1063,21 @@ def create_account_in_notion(
     if v:
         properties[_p("Apollo Account ID", prop_map)] = {"rich_text": [{"text": {"content": v}}]}
 
+    account_contact_fields = [
+        ("person_name", "[Suspect] Contact Name", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("linkedin_url", "[Suspect] Contact LinkedIn URL", lambda v: {"url": v} if v.startswith("http") else None),
+        ("email", "[Suspect] Contact Email", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("job_title", "[Suspect] Job Title", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("phone", "[Suspect] Contact Phone", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("campaign_sender", "Campaign Sender", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+    ]
+    for key, prop_name, builder in account_contact_fields:
+        v = clean_value(data.get(key))
+        if v:
+            result = builder(v)
+            if result:
+                properties[_p(prop_name, prop_map)] = result
+
     try:
         resp = http_requests.post(
             "https://api.notion.com/v1/pages",
@@ -1134,6 +1165,12 @@ def update_account_in_notion(
         ("latest_funding", "Latest Funding", lambda v: {"rich_text": [{"text": {"content": v}}]}),
         ("funding_amount", "Funding Amount", None),
         ("apollo_account_id", "Apollo Account ID", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("person_name", "[Suspect] Contact Name", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("linkedin_url", "[Suspect] Contact LinkedIn URL", lambda v: {"url": v} if v.startswith("http") else None),
+        ("email", "[Suspect] Contact Email", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("job_title", "[Suspect] Job Title", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("phone", "[Suspect] Contact Phone", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("campaign_sender", "Campaign Sender", lambda v: {"rich_text": [{"text": {"content": v}}]}),
     ]
 
     for key, prop_name, builder in fill_if_empty:
@@ -1389,6 +1426,134 @@ def get_contacts_for_copywriting(
     return contacts
 
 
+def get_accounts_for_copywriting(
+    accounts_db_id: str,
+    campaign_id: str = "",
+    force: bool = False,
+    prop_map: Optional[dict] = None,
+) -> List[dict]:
+    """
+    Fetch account-level contact records that need outreach copy.
+
+    This is the fallback path when the Contacts database is not shared with the
+    integration. It uses the [Suspect] contact fields and outreach properties
+    directly on the Accounts database.
+    """
+    if not NOTION_TOKEN:
+        return []
+
+    headers = _notion_api_headers()
+    url = f"https://api.notion.com/v1/databases/{accounts_db_id}/query"
+    results = []
+    has_more = True
+    start_cursor = None
+
+    while has_more:
+        body = {"page_size": 100}
+        if start_cursor:
+            body["start_cursor"] = start_cursor
+
+        resp = http_requests.post(url, headers=headers, json=body)
+        if resp.status_code != 200:
+            console.print(f"[red]Accounts query error: {resp.status_code} - {resp.json().get('message', '')}[/red]")
+            return []
+
+        data = resp.json()
+        results.extend(data.get("results", []))
+        has_more = data.get("has_more", False)
+        start_cursor = data.get("next_cursor")
+
+    contacts = []
+    skip_statuses = {
+        "Contacted LinkedIn \U0001f310", "Contacted Email \U0001f4e7",
+        "Contacted Mail \U0001f4e9", "Engaged", "Discovery Call Booked",
+        "Proposal Sent", "Partner Confirmed \U0001f91d", "Active Partner",
+        "Churned", "Disqualified", "Prospect Unqualified",
+    }
+
+    for page in results:
+        props = page.get("properties", {})
+        account_page_id = page.get("id", "")
+
+        def _text(prop_name):
+            p = props.get(_p(prop_name, prop_map), {})
+            if p.get("type") == "rich_text" and p.get("rich_text"):
+                return "".join(t.get("plain_text", "") for t in p.get("rich_text", []))
+            if p.get("type") == "formula" and p.get("formula", {}).get("type") == "string":
+                return p["formula"].get("string") or ""
+            return ""
+
+        def _title():
+            for pdata in props.values():
+                if pdata.get("type") == "title":
+                    return "".join(t.get("plain_text", "") for t in pdata.get("title", []))
+            return ""
+
+        def _url(prop_name):
+            p = props.get(_p(prop_name, prop_map), {})
+            return p.get("url") or "" if p.get("type") == "url" else ""
+
+        def _select(prop_name):
+            p = props.get(_p(prop_name, prop_map), {})
+            return p.get("select", {}).get("name", "") if p.get("type") == "select" and p.get("select") else ""
+
+        def _status():
+            p = props.get(_p("Status", prop_map), {})
+            return p.get("status", {}).get("name", "") if p.get("type") == "status" and p.get("status") else ""
+
+        def _multi_select(prop_name):
+            p = props.get(_p(prop_name, prop_map), {})
+            if p.get("type") == "multi_select":
+                return [ms.get("name", "") for ms in p.get("multi_select", [])]
+            return []
+
+        def _number(prop_name):
+            p = props.get(_p(prop_name, prop_map), {})
+            return p.get("number") if p.get("type") == "number" else None
+
+        account_campaigns = _multi_select("Campaign ID")
+        if campaign_id and campaign_id not in account_campaigns:
+            continue
+
+        status = _status()
+        if status in skip_statuses and not force:
+            continue
+
+        if not force and _text("LinkedIn 1st Cold"):
+            continue
+
+        person_name = _text("[Suspect] Contact Name").strip()
+        linkedin_url = _url("[Suspect] Contact LinkedIn URL")
+        email = _text("[Suspect] Contact Email").strip()
+        if not person_name and not linkedin_url and not email:
+            continue
+
+        country_list = _multi_select("Country")
+        contacts.append({
+            "contact_page_id": account_page_id,
+            "contact_storage": "account",
+            "person_name": person_name or "there",
+            "email": email,
+            "linkedin_url": linkedin_url,
+            "job_title": _text("[Suspect] Job Title"),
+            "account_page_id": account_page_id,
+            "company_name": _title(),
+            "website": _url("Website URL*"),
+            "industry": _text("Industry (Corporates)"),
+            "mission": _text("Mission*"),
+            "trigger": _text("Trigger Event"),
+            "account_type": _select("Account Type*"),
+            "city": _select("City"),
+            "country": country_list[0] if country_list else "",
+            "company_description": _text("Company Description"),
+            "latest_funding": _text("Latest Funding"),
+            "employees": _number("# Employees"),
+            "campaign_sender": _text("Campaign Sender"),
+        })
+
+    return contacts
+
+
 def _fetch_account_context(account_page_id: str, headers: dict) -> dict:
     """Fetch relevant account fields for copywriting context."""
     try:
@@ -1530,4 +1695,58 @@ def update_contact_outreach(
 
     except Exception as e:
         console.print(f"[red]Error updating outreach: {e}[/red]")
+        return False
+
+
+def update_account_outreach(
+    account_page_id: str,
+    linkedin_first: str,
+    linkedin_fu: str,
+    email_body: str,
+    email_subject: str,
+    ab_variant: str = "",
+    prop_map: Optional[dict] = None,
+) -> bool:
+    """Write outreach messages directly to an Account page fallback record."""
+    if not NOTION_TOKEN:
+        return False
+
+    headers = _notion_api_headers()
+    properties = {}
+
+    if linkedin_first:
+        properties[_p("LinkedIn 1st Cold", prop_map)] = {
+            "rich_text": [{"text": {"content": linkedin_first[:2000]}}]
+        }
+    if linkedin_fu:
+        properties[_p("LinkedIn FU message", prop_map)] = {
+            "rich_text": [{"text": {"content": linkedin_fu[:2000]}}]
+        }
+    if email_body:
+        properties[_p("Cold Email Body", prop_map)] = {
+            "rich_text": [{"text": {"content": email_body[:2000]}}]
+        }
+    if email_subject:
+        properties[_p("Cold Email Subject Text", prop_map)] = {
+            "rich_text": [{"text": {"content": email_subject[:2000]}}]
+        }
+    if ab_variant in ("A", "B"):
+        properties[_p("AB Variant", prop_map)] = {"select": {"name": ab_variant}}
+
+    if not properties:
+        return True
+
+    try:
+        resp = http_requests.patch(
+            f"https://api.notion.com/v1/pages/{account_page_id}",
+            headers=headers,
+            json={"properties": properties}
+        )
+        if resp.status_code == 200:
+            return True
+        err = resp.json().get("message", resp.text)
+        console.print(f"[red]  Account outreach update failed: {resp.status_code} - {err}[/red]")
+        return False
+    except Exception as e:
+        console.print(f"[red]Error updating account outreach: {e}[/red]")
         return False

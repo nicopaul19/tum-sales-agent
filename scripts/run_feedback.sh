@@ -26,7 +26,7 @@ echo "=== Feedback run: $(date) ===" >> "$LOG_FILE"
 
 source "$PROJECT_DIR/venv/bin/activate"
 cd "$PROJECT_DIR"
-python -m agents.feedback_agent >> "$LOG_FILE" 2>&1
+python3 -m agents.feedback_agent >> "$LOG_FILE" 2>&1
 
 EXITCODE=$?
 echo "=== Exit code: $EXITCODE ===" >> "$LOG_FILE"

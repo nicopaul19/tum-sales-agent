@@ -30,7 +30,7 @@ echo "=== Notion Cleanup run: $(date) ===" >> "$LOG_FILE"
 # Phase 1: Domain population (runs in background, output to log)
 source "$PROJECT_DIR/venv/bin/activate"
 cd "$PROJECT_DIR"
-python -m agents.notion_cleanup --domains >> "$LOG_FILE" 2>&1
+python3 -m agents.notion_cleanup --domains >> "$LOG_FILE" 2>&1
 
 PHASE1_EXIT=$?
 echo "=== Phase 1 exit code: $PHASE1_EXIT ===" >> "$LOG_FILE"
@@ -40,7 +40,7 @@ if [ $PHASE1_EXIT -eq 0 ]; then
     osascript -e "
         tell application \"Terminal\"
             activate
-            do script \"cd '$PROJECT_DIR' && source venv/bin/activate && python -m agents.notion_cleanup --merge; echo ''; echo 'Press any key to close...'; read -n 1\"
+            do script \"cd '$PROJECT_DIR' && source venv/bin/activate && python3 -m agents.notion_cleanup --merge; echo ''; echo 'Press any key to close...'; read -n 1\"
         end tell
     "
     echo "=== Phase 2 launched in Terminal for interactive review ===" >> "$LOG_FILE"

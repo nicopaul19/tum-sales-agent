@@ -1,11 +1,11 @@
 """
-Ranking Agent - Scores leads and outputs weekly qualified leads.
+Ranking Agent - Scores leads and outputs an on-demand campaign shortlist.
 
 Logic:
 1. Read pending leads from master_input.csv
 2. Score each lead using GPT-4o (0-10)
 3. All leads with score >= 5 are qualified
-4. Save qualified leads to weekly_qualified_leads.csv (for Apollo import)
+4. Save qualified leads to campaign shortlist CSVs (legacy filenames keep weekly_)
 5. Save rest to backlog.csv
 6. Update statuses in master_input.csv
 
@@ -543,7 +543,7 @@ def score_lead(lead: dict, pipeline_section: str = "") -> tuple[float, str, list
 
 
 def _generate_ranking_email_html(stats: dict) -> str:
-    """Generate HTML email body for the weekly ranking report."""
+    """Generate HTML email body for the on-demand top leads report."""
     date_str = datetime.now().strftime("%B %d, %Y")
 
     def badge(value, color):
@@ -608,7 +608,7 @@ def _generate_ranking_email_html(stats: dict) -> str:
     <html>
     <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:20px;color:#333;">
         <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:24px;border-radius:12px 12px 0 0;">
-            <h1 style="margin:0;font-size:22px;">Weekly Qualified Leads Report</h1>
+            <h1 style="margin:0;font-size:22px;">Top Leads Report</h1>
             <p style="margin:8px 0 0;opacity:0.8;font-size:14px;">{date_str}</p>
         </div>
 
@@ -648,7 +648,7 @@ def _generate_ranking_email_html(stats: dict) -> str:
 
 def _send_ranking_report(stats: dict, csv_with: Path, csv_without: Path,
                          extra_csvs: List[Path] = None, subject_override: str = "") -> bool:
-    """Send weekly ranking report email with CSV attachments."""
+    """Send top leads report email with CSV attachments."""
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
         console.print("[yellow]Email not configured (GMAIL_ADDRESS / GMAIL_APP_PASSWORD missing). Skipping email.[/yellow]")
         return False
@@ -667,7 +667,7 @@ def _send_ranking_report(stats: dict, csv_with: Path, csv_without: Path,
     if subject_override:
         subject = subject_override
     else:
-        subject = f"TUM Social AI \u2014 Weekly Leads: {qualified} qualified ({with_contact} with contacts)"
+        subject = f"TUM Social AI \u2014 Top Leads: {qualified} qualified ({with_contact} with contacts)"
 
     msg = MIMEMultipart()
     msg["From"] = GMAIL_ADDRESS
@@ -1046,7 +1046,7 @@ def run_ranking(subject_override: str = ""):
 
         # Display leads with contact
         if not with_contact.empty:
-            table = Table(title=f"Weekly Qualified Leads — With Contact ({len(with_contact)})")
+            table = Table(title=f"Top Leads — With Contact ({len(with_contact)})")
             table.add_column("#", style="dim")
             table.add_column("Company", style="cyan")
             table.add_column("Contact", style="white")
@@ -1205,7 +1205,7 @@ def run_ranking(subject_override: str = ""):
     summary_table.add_row("Blocked (engaged+)", str(len(blocked_leads)))
     summary_table.add_row("Skipped (active campaign)", str(len(active_campaign_leads)))
     summary_table.add_row("Re-qualified", str(len(requalified_leads)))
-    summary_table.add_row("Weekly qualified", str(len(weekly_qualified)))
+    summary_table.add_row("Campaign shortlist", str(len(weekly_qualified)))
     if not weekly_qualified.empty:
         summary_table.add_row("  → With contact", str(len(with_contact)))
         summary_table.add_row("  → No contact", str(len(without_contact)))

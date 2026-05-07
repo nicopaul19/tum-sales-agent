@@ -61,42 +61,41 @@ delay 0.3
 tell application "System Events"
     -- Trigger Save As (Cmd+S)
     keystroke "s" using command down
-    delay 1.5
-
-    -- Wait for save dialog to appear
-    repeat 10 times
-        if exists sheet 1 of window 1 of process "$FRONT_APP" then
-            exit repeat
-        end if
-        delay 0.3
-    end repeat
+    
+    -- Wait enough time for the Save dialog to appear (no UI indexing loops)
+    delay 2.5
 
     tell process "$FRONT_APP"
-        -- Set filename
-        set value of text field 1 of sheet 1 of window 1 to "$FILENAME"
-        delay 0.3
+        -- By default, the text field for the filename is focused.
+        keystroke "$FILENAME"
+        delay 0.5
 
         -- Navigate to save directory via Cmd+Shift+G (Go to Folder)
         keystroke "g" using {command down, shift down}
-        delay 1
+        delay 1.5
 
-        -- Type the path and press Enter
+        -- Type the path
         keystroke "$DUMP_DIR"
-        delay 0.5
+        delay 1.0
+        
+        -- Press Enter to confirm Go to Folder
         keystroke return
-        delay 1
+        delay 1.5
 
-        -- Click Save
-        click button "Save" of sheet 1 of window 1
+        -- Press Enter to finally Save
+        keystroke return
     end tell
 end tell
 APPLESCRIPT
 
 # Wait for file to be written (Chrome can take a while for large pages)
 WAITED=0
-MAX_WAIT=15
+MAX_WAIT=240
 while [ $WAITED -lt $MAX_WAIT ]; do
     if [ -f "$FILEPATH" ] && [ -s "$FILEPATH" ]; then
+        # Chrome might write the HTML file incrementally. 
+        # Add a small buffer to ensure it's completely written.
+        sleep 2
         break
     fi
     sleep 1
@@ -124,7 +123,7 @@ osascript -e "display notification \"Network saved — running analysis...\" wit
 
 cd "$PROJECT_DIR"
 source "$PROJECT_DIR/venv/bin/activate"
-python -m agents.linkedin_manager 2>&1
+python3 -m agents.linkedin_manager --connections-file "$FILEPATH" 2>&1
 ANALYSIS_EXIT=$?
 
 if [ $ANALYSIS_EXIT -eq 0 ]; then

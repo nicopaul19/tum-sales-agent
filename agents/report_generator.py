@@ -1,5 +1,5 @@
 """
-LinkedIn Report Generator — PDF and email report for weekly outreach review.
+LinkedIn Report Generator — PDF and email report for outreach review.
 
 Follows the SupervisorPDF pattern from agents/supervisor.py.
 Generates a summary of outreach actions: new connections, follow-ups, ghosted.
@@ -65,6 +65,8 @@ class ActionItem:
         draft_message: str = "",
         cold_message: str = "",
         fu_message: str = "",
+        account_id: str = "",
+        update_contacted_date: bool = False,
     ):
         self.category = category
         self.partner_name = partner_name
@@ -76,6 +78,8 @@ class ActionItem:
         self.draft_message = draft_message
         self.cold_message = cold_message
         self.fu_message = fu_message
+        self.account_id = account_id
+        self.update_contacted_date = update_contacted_date
 
 
 # =============================================================================
@@ -87,7 +91,7 @@ class LinkedInReportPDF(FPDF):
 
     def header(self):
         self.set_font("Helvetica", "B", 14)
-        self.cell(0, 10, "TUM Social AI - Weekly Outreach Review", new_x="LMARGIN", new_y="NEXT", align="C")
+        self.cell(0, 10, "TUM Social AI - Outreach Review", new_x="LMARGIN", new_y="NEXT", align="C")
         self.set_font("Helvetica", "", 9)
         self.cell(0, 5, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", new_x="LMARGIN", new_y="NEXT", align="C")
         self.ln(4)
@@ -147,7 +151,7 @@ class LinkedInReportPDF(FPDF):
 
 def generate_linkedin_report(actions: List[ActionItem], stats: Optional[dict] = None) -> Path:
     """
-    Build the weekly LinkedIn report PDF.
+    Build the LinkedIn outreach report PDF.
 
     Args:
         actions: List of ActionItem objects from the linkedin manager
@@ -246,7 +250,7 @@ def generate_email_html(actions: List[ActionItem], stats: Optional[dict] = None)
 
     lines = []
     lines.append("<html><body style='font-family: -apple-system, Arial, sans-serif; max-width: 600px;'>")
-    lines.append("<h2 style='color: #1a73e8;'>TUM Social AI — Weekly Outreach Review</h2>")
+    lines.append("<h2 style='color: #1a73e8;'>TUM Social AI — Outreach Review</h2>")
     lines.append(f"<p style='color: #666;'>{datetime.now().strftime('%Y-%m-%d %H:%M')}</p>")
 
     # Summary

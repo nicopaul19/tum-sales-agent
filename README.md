@@ -1,113 +1,61 @@
-# 🤖 TUM Sales Agent
+# TUM Social AI — Strategic Partnerships Agents
 
-> ⚠️ **Private Repository** — Internal use only.
+Command-first infrastructure for collecting partnership leads, creating on-demand campaign shortlists, uploading Apollo-enriched leads into Notion, generating sender-aware outreach copy, and reviewing LinkedIn follow-ups.
 
-A multi-agent AI sales pipeline for automated lead discovery, scoring, enrichment, and outreach — built for TUM Social AI.
-
-## System Overview
-
-This is a complete **AI-powered sales automation system** consisting of multiple specialized agents:
-
-### Agents
-
-| Agent | What It Does | Schedule |
-|-------|-------------|----------|
-| **Collector** | Extracts leads from LinkedIn screenshots, URLs, and manual inputs | On-demand / watch mode |
-| **Ranking Agent** | GPT-4o scoring (0-10) with dedup checking against Notion CRM | Tue/Thu 10am |
-| **Upload Agent** | Pushes qualified leads to Notion CRM databases | After ranking |
-| **LinkedIn Manager** | Parses LinkedIn connection exports for new connections | Weekly |
-| **Copywriter Agent** | Generates personalized outreach messages (LinkedIn + email) | Manual |
-| **Feedback Agent** | Collects team feedback on lead quality | Weekly |
-| **Supervisor** | Runs full pipeline & generates weekly reports | Weekly |
-| **Report Generator** | PDF reports with cost tracking & pipeline analytics | On-demand |
-
-### Data Flow
-
-```
-LinkedIn Screenshots/URLs → Collector → Master CSV
-                                           ↓
-                                    Ranking Agent (GPT-4o scoring)
-                                           ↓
-                                    Upload Agent → Notion CRM
-                                           ↓
-                                    Copywriter → Outreach Messages
-```
+The system is no longer a fixed weekly campaign machine. Intake can stay automated, but ranking, reports, upload, copywriting, LinkedIn review, feedback, and cleanup are run when a teammate asks for them.
 
 ## Quick Start
 
-### 1. Clone & install
-
 ```bash
-git clone https://github.com/nicopaul19/tum-sales-agent.git
-cd tum-sales-agent
+git clone https://github.com/tumsocialai/strategic-partnerships.git
+cd strategic-partnerships
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate   # Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
-
-### 2. Configure
-
-```bash
 cp .env.template .env
-# Edit .env with your API keys
+python agent.py --help
 ```
 
-### 3. Run individual agents
+## Main Commands
 
-```bash
-# Collect leads from inputs
-python -m agents.collector
+| Task | Command |
+|---|---|
+| Process new inputs | `python agent.py collect` |
+| Create top leads report | `python agent.py rank` |
+| Upload Apollo export | `python agent.py upload --csv "apollo.csv" --sender "Full Name"` |
+| Generate outreach copy | `python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"` |
+| LinkedIn follow-up review | `python agent.py linkedin --connections-file "network.html"` |
+| Infrastructure audit | `python agent.py supervisor` |
+| Feedback analysis | `python agent.py feedback` |
+| Notion cleanup | `python agent.py cleanup --all` |
 
-# Score & rank leads
-python -m agents.ranking_agent
+## Agent Logic
 
-# Upload to Notion CRM
-python -m agents.upload_agent
-
-# Full pipeline
-python -m agents.supervisor
-```
-
-## Project Structure
-
-```
-tum_sales_agent/
-├── agents/                   # All agent modules
-│   ├── collector.py          # Lead input processing (screenshots, URLs)
-│   ├── ranking_agent.py      # GPT-4o lead scoring
-│   ├── upload_agent.py       # Notion CRM uploader
-│   ├── linkedin_manager.py   # LinkedIn connections analysis
-│   ├── linkedin_parser.py    # LinkedIn HTML parser
-│   ├── copywriter_agent.py   # Outreach message generation
-│   ├── feedback_agent.py     # Team feedback collection
-│   ├── supervisor.py         # Pipeline orchestrator
-│   ├── report_generator.py   # PDF/analytics reports
-│   └── notion_cleanup.py     # Notion database maintenance
-├── utils/                    # Shared utilities
-│   ├── config.py             # Configuration & env loading
-│   ├── notion_client.py      # Notion API wrapper
-│   ├── apollo_client.py      # Apollo.io API client
-│   ├── api_logger.py         # API cost tracking
-│   └── preflight.py          # Pre-run validation
-├── scripts/                  # Shell scripts for agents
-├── data/                     # Data directory (gitignored)
-│   ├── inputs/               # Lead input files
-│   ├── tables/               # CSV data files
-│   ├── reports/              # Generated reports
-│   └── logs/                 # API usage logs
-├── requirements.txt          # Python dependencies
-├── .env.template             # Environment variable template
-└── ONBOARDING.md             # Detailed system documentation
-```
+| Agent / flow | Built on |
+|---|---|
+| `collector` | LinkedIn screenshots, LinkedIn URLs, and manual contacts; GPT-4o Vision/entity extraction; dedup by domain/person/profile URL. |
+| `ranking_agent` | GPT-4o 0-10 scoring for impact fit, AI/talent relevance, student ecosystem signal, similarity to pipeline wins, and timing/trigger quality. |
+| Apollo enrichment | Manual enrichment after ranking so the team enriches only selected campaign leads. |
+| `upload_agent` | Apollo CSV parsing, Notion schema/preflight checks, account/contact deduplication, campaign sender, campaign ID, and safe create/update behavior. |
+| `copywriter_agent` | Outreach skill prompt, processed learnings, campaign sender, contact/account context, trigger event, and four generated messages. |
+| `linkedin_manager` | Saved LinkedIn connections HTML, Notion matching, follow-up/ghosting thresholds, and status hierarchy guards. |
 
 ## Requirements
 
-- Python 3.8+
-- OpenAI API account (GPT-4o)
-- Notion workspace with CRM databases
-- Gmail account with App Password (for email reports)
-- Apollo.io API key (optional, for lead enrichment)
+- Python 3.9+
+- OpenAI API key
+- Notion integration token with access to Accounts and Contacts databases
+- Optional Gmail app password for report emails
+- Codex, Claude Code, Antigravity, or a normal terminal
+
+See [ONBOARDING.md](ONBOARDING.md) or open `ONBOARDING.html` for teammate setup, cadence, troubleshooting, and operating guidance.
+
+## Automation Policy
+
+Keep scheduled: collector, project applications, requirements enrichment.
+
+Run on demand: ranking/top leads report, upload, copywriter, LinkedIn manager, supervisor, feedback, cleanup, enrichment.
 
 ## License
 
-Proprietary — TUM Social AI
+Proprietary — TUM Social AI · https://tum-socialaiclub.de
