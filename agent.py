@@ -71,6 +71,14 @@ def main() -> int:
     cleanup.add_argument("--merge", action="store_true", help="Merge duplicates")
     cleanup.add_argument("--all", action="store_true", help="Run all cleanup phases")
 
+    phone = sub.add_parser("phone-enrich", help="Fill missing company phone numbers from company websites")
+    phone.add_argument("--database-id", default="", help="Notion Accounts database ID")
+    phone.add_argument("--dry-run", action="store_true", help="Preview without writing to Notion")
+    phone.add_argument("--limit", type=int, default=0, help="Limit number of target accounts to scan")
+    phone.add_argument("--pages-per-account", type=int, default=12, help="Maximum pages to scan per account")
+    phone.add_argument("--timeout", type=int, default=8, help="HTTP timeout per page in seconds")
+    phone.add_argument("--force", action="store_true", help="Re-scan accounts even if phone is already present")
+
     args = parser.parse_args()
 
     if args.command == "collect":
@@ -127,6 +135,21 @@ def main() -> int:
         if args.all:
             module_args.append("--all")
         return run_module("agents.notion_cleanup", module_args)
+    if args.command == "phone-enrich":
+        module_args = []
+        if args.database_id:
+            module_args += ["--database-id", args.database_id]
+        if args.dry_run:
+            module_args.append("--dry-run")
+        if args.limit:
+            module_args += ["--limit", str(args.limit)]
+        if args.pages_per_account:
+            module_args += ["--pages-per-account", str(args.pages_per_account)]
+        if args.timeout:
+            module_args += ["--timeout", str(args.timeout)]
+        if args.force:
+            module_args.append("--force")
+        return run_module("agents.company_phone_enrichment_agent", module_args)
 
     parser.error("Unknown command")
     return 2

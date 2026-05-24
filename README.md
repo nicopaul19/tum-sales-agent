@@ -2,7 +2,7 @@
 
 Command-first infrastructure for collecting partnership leads, creating on-demand campaign shortlists, uploading Apollo-enriched leads into Notion, generating sender-aware outreach copy, and reviewing LinkedIn follow-ups.
 
-The system is no longer a fixed weekly campaign machine. Intake can stay automated, but ranking, reports, upload, copywriting, LinkedIn review, feedback, and cleanup are run when a teammate asks for them.
+The system is no longer a fixed weekly campaign machine. Intake, safe cleanup, and feedback analysis can stay automated, while ranking, reports, upload, copywriting, and LinkedIn review are run when a teammate asks for them.
 
 ## Quick Start
 
@@ -25,6 +25,7 @@ python agent.py --help
 | Upload Apollo export | `python agent.py upload --csv "apollo.csv" --sender "Full Name"` |
 | Generate outreach copy | `python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"` |
 | LinkedIn follow-up review | `python agent.py linkedin --connections-file "network.html"` |
+| Company phone enrichment | `python agent.py phone-enrich` |
 | Infrastructure audit | `python agent.py supervisor` |
 | Feedback analysis | `python agent.py feedback` |
 | Notion cleanup | `python agent.py cleanup --all` |
@@ -37,8 +38,10 @@ python agent.py --help
 | `ranking_agent` | GPT-4o 0-10 scoring for impact fit, AI/talent relevance, student ecosystem signal, similarity to pipeline wins, and timing/trigger quality. |
 | Apollo enrichment | Manual enrichment after ranking so the team enriches only selected campaign leads. |
 | `upload_agent` | Apollo CSV parsing, Notion schema/preflight checks, account/contact deduplication, campaign sender, campaign ID, and safe create/update behavior. |
-| `copywriter_agent` | Outreach skill prompt, processed learnings, campaign sender, contact/account context, trigger event, and four generated messages. |
+| `copywriter_agent` | Outreach skill prompt, processed feedback learnings, campaign sender, contact/account context, trigger event, and four generated messages. |
+| `feedback_agent` | Outreach outcome classification, A/B test analysis, Notion Iterations page ingestion, and `outreach_learnings.md` updates. |
 | `linkedin_manager` | Saved LinkedIn connections HTML, Notion matching, follow-up/ghosting thresholds, and status hierarchy guards. |
+| `company_phone_enrichment_agent` | Notion Accounts filter, website page discovery, Impressum/Kontakt/contact scanning, phone normalization to `+...`, and safe phone-only updates. |
 
 ## Requirements
 
@@ -52,9 +55,9 @@ See [ONBOARDING.md](ONBOARDING.md) or open `ONBOARDING.html` for teammate setup,
 
 ## Automation Policy
 
-Keep scheduled: collector, project applications, requirements enrichment.
+Keep scheduled: collector, project applications, requirements enrichment, Notion cleanup, feedback analysis.
 
-Run on demand: ranking/top leads report, upload, copywriter, LinkedIn manager, supervisor, feedback, cleanup, enrichment.
+Run on demand: ranking/top leads report, upload, copywriter, LinkedIn manager, supervisor, enrichment.
 
 ## License
 

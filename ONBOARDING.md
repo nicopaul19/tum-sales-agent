@@ -28,9 +28,9 @@ The system is intentionally no longer a fixed weekly campaign machine. Campaign 
 | `ranking_agent` filters | Prevents obvious bad leads from entering campaigns. | Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized. |
 | Apollo enrichment | Adds verified company/contact data before Notion upload. | This step is manual in Apollo. It is used after ranking so the team does not spend enrichment effort on weak leads. Apollo exports should include account/contact identifiers, email, title, company domain, LinkedIn, employee/funding fields when available, and campaign-relevant contact rows. |
 | `upload_agent` | Uploads Apollo CSVs into Notion Accounts and Contacts. | Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended. |
-| `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus processed `data/prompts/outreach_learnings.md`, active quality iterations from the Notion Iterations page, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in `partnerships@tum-socialaiclub.de` for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
+| `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus processed `data/prompts/outreach_learnings.md`, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in `partnerships@tum-socialaiclub.de` for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
 | `linkedin_manager` | Reviews LinkedIn connection/follow-up actions. | Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3-5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard. |
-| `feedback_agent` | Turns outcome data into prompt learnings. | Reads enough resolved outcomes, analyzes what copy worked or failed, and distills reusable guidance into `data/prompts/outreach_learnings.md` for future copywriter runs. |
+| `feedback_agent` | Turns outcome data and manual copywriter iterations into prompt learnings. | Reads resolved outcomes, analyzes A/B test results, scans the Notion Iterations page, distills reusable guidance into `data/prompts/outreach_learnings.md`, and moves processed iteration notes into the Processed section. |
 
 ### Strategic Ranking Criteria Details
 
@@ -178,6 +178,7 @@ Recommended calendar blocks:
 | `com.tumsocialai.project-applications` | Monday 09:30 | Processes project application intake. |
 | `com.tumsocialai.requirements-enrichment` | Monday 07:00 + 12:00 | Enriches requirements/applications. |
 | `com.tumsocialai.notion-cleanup` | Monday 10:00 + 15:00 | Fills missing domains/account types automatically; duplicate merges remain manual. |
+| `com.tumsocialai.feedback-agent` | Monday 11:00 + 16:00 | Analyzes outreach outcomes, A/B results, and Notion copywriter iterations. |
 
 Campaign/action jobs that run on demand:
 
@@ -186,7 +187,6 @@ Campaign/action jobs that run on demand:
 | `com.tumsocialai.sales-ranking` | Manual (`python agent.py rank`) |
 | `com.tumsocialai.linkedin-manager` | Manual (`python agent.py linkedin ...`) |
 | `com.tumsocialai.sales-supervisor` | Manual (`python agent.py supervisor`) |
-| `com.tumsocialai.feedback-agent` | Manual (`python agent.py feedback`) |
 | `com.tumsocialai.enrichment` | Manual |
 | `com.tumsocialai.copywriter` | Manual (`python agent.py copywrite --campaign ... --sender ...`) |
 
@@ -216,13 +216,13 @@ The CSV filenames still contain `weekly_` for backward compatibility. Treat them
 
 ## 8. Copywriter Improvement Loop
 
-The copywriter runs **automatically every Monday at 09:10** (`com.tumsocialai.copywriter` launchd job). Each run:
+The weekly feedback agent (`com.tumsocialai.feedback-agent`) owns the copywriter improvement loop. Each run:
 
 1. Reads unprocessed iterations from the [Notion Iterations page](https://www.notion.so/Iterations-on-Strategic-Partnersh-Copywriter-Agent-366a0c6e616880f8ba37ffa95d90b2fa)
-2. Injects them into the GPT-4o prompt so the mistakes are not repeated
-3. Writes outreach copy to Notion contacts
-4. Creates Gmail drafts in `partnerships@tum-socialaiclub.de` for every contact with an email
-5. Moves processed iterations into the **Processed ✅** toggle on the Notion page
+2. Combines them with outreach outcome data and A/B test statistics
+3. Writes consolidated guidance to `data/prompts/outreach_learnings.md`
+4. Moves processed iterations into the **Processed ✅** toggle on the Notion page
+5. The copywriter agent consumes `outreach_learnings.md` on its next on-demand campaign run
 
 ### Adding a New Iteration (When You Flag a Bad Draft)
 
@@ -234,7 +234,7 @@ Open the [Iterations page](https://www.notion.so/Iterations-on-Strategic-Partner
   - Improved version
   - Why the improved version is better
 
-The agent will pick it up on the next Monday run and mark it as **Processed ✅** automatically.
+The feedback agent will pick it up on the next Monday run and mark it as **Processed ✅** automatically.
 
 ### Gmail Draft Review
 

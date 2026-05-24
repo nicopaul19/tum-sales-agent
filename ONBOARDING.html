@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TUM Social AI — Strategic Partnerships Onboarding</title>
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.7; }
+  /* ── Base ── */
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 960px; margin: 40px auto; padding: 0 24px; color: #1a1a1a; line-height: 1.7; }
   h1 { color: #0a2463; border-bottom: 3px solid #0a2463; padding-bottom: 8px; }
   h2 { color: #0a2463; margin-top: 2.5em; }
   h3 { color: #333; }
@@ -18,158 +19,459 @@
   pre code { background: none; color: inherit; padding: 0; }
   a { color: #0a2463; }
   blockquote { border-left: 4px solid #0a2463; margin: 0; padding: 8px 16px; background: #f0f4ff; }
+
+  /* ── Pipeline diagram design system ── */
+  :root {
+    --node-input:    #e8f4fd;
+    --node-auto:     #e6f4ea;
+    --node-manual:   #fff3e0;
+    --node-output:   #f3e5f5;
+    --node-email:    #fce4ec;
+    --node-weekly:   #e8eaf6;
+    --border-input:  #1565c0;
+    --border-auto:   #2e7d32;
+    --border-manual: #e65100;
+    --border-output: #6a1b9a;
+    --border-email:  #c62828;
+    --border-weekly: #283593;
+  }
+
+  .pipeline-section { margin: 2.5em 0; }
+  .pipeline-section h3 { color: #0a2463; margin-bottom: 1em; }
+
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    font-size: 0.85em;
+  }
+
+  /* Stage row */
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+
+  .stage-label {
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 6px;
+  }
+
+  .stage-nodes {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Node pill */
+  .node {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border-left: 4px solid #ccc;
+    background: #f5f5f5;
+    min-width: 160px;
+    max-width: 200px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .node-title { font-weight: 700; color: #111; margin-bottom: 2px; font-size: 0.95em; }
+  .node-sub   { color: #666; font-size: 0.8em; line-height: 1.4; }
+  .node-badge { font-size: 0.7em; font-weight: 600; border-radius: 4px; padding: 1px 6px; margin-top: 5px; }
+
+  .node-input  { background: var(--node-input);  border-left-color: var(--border-input);  }
+  .node-auto   { background: var(--node-auto);   border-left-color: var(--border-auto);   }
+  .node-manual { background: var(--node-manual); border-left-color: var(--border-manual); }
+  .node-output { background: var(--node-output); border-left-color: var(--border-output); }
+  .node-email  { background: var(--node-email);  border-left-color: var(--border-email);  }
+  .node-weekly { background: var(--node-weekly); border-left-color: var(--border-weekly); }
+
+  .badge-auto   { background: #c8e6c9; color: #1b5e20; }
+  .badge-manual { background: #ffe0b2; color: #bf360c; }
+  .badge-weekly { background: #c5cae9; color: #1a237e; }
+  .badge-email  { background: #ffcdd2; color: #b71c1c; }
+
+  /* Connectors */
+  .vline {
+    width: 2px;
+    height: 28px;
+    background: #bbb;
+    margin: 0 auto;
+  }
+  .arrow-down {
+    width: 0; height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 9px solid #bbb;
+    margin: 0 auto;
+  }
+  .connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Branch layout */
+  .branch-wrap {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+    justify-content: center;
+    align-items: flex-start;
+    width: 100%;
+  }
+  .branch-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    flex: 1;
+    min-width: 180px;
+    max-width: 280px;
+  }
+  .branch-label {
+    font-size: 0.7em;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-bottom: 8px;
+  }
+  .branch-label-green { background: #c8e6c9; color: #1b5e20; }
+  .branch-label-orange { background: #ffe0b2; color: #bf360c; }
+  .branch-label-purple { background: #e1bee7; color: #4a148c; }
+
+  .branch-divider {
+    width: 60%;
+    height: 2px;
+    background: #ddd;
+    margin: 8px auto;
+    border-radius: 1px;
+  }
+
+  .annotation {
+    font-size: 0.72em;
+    color: #888;
+    font-style: italic;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 1.5em 0;
+    padding: 14px 18px;
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.82em;
+    color: #444;
+  }
+  .legend-swatch {
+    width: 16px; height: 16px;
+    border-radius: 4px;
+    border-left: 4px solid #ccc;
+    flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
+
 <h1>TUM Social AI — Strategic Partnerships Agents</h1>
-<h2>On-Demand Campaign Onboarding Guide</h2>
-<p><strong>Last updated:</strong> May 24, 2026<br />
-<strong>Audience:</strong> TUM Social AI teammates running partnership campaigns from Codex, Claude Code, Antigravity, or a terminal.</p>
-<hr />
+<h2 style="margin-top:0.3em; color:#444; font-weight:400; font-size:1.1em;">On-Demand Campaign Onboarding Guide</h2>
+<p><strong>Last updated:</strong> May 24, 2026 &nbsp;|&nbsp; <strong>Audience:</strong> TUM Social AI teammates running partnership campaigns from Codex, Claude Code, Antigravity, or a terminal.</p>
+
+<hr>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VISUAL PIPELINE FLOW DIAGRAM
+     ═══════════════════════════════════════════════════════════ -->
+<h2>Pipeline Flow</h2>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--node-input); border-left-color:var(--border-input);"></div> Input / data source</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--node-auto); border-left-color:var(--border-auto);"></div> Automated agent</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--node-manual); border-left-color:var(--border-manual);"></div> Manual step</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--node-output); border-left-color:var(--border-output);"></div> Output / destination</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--node-email); border-left-color:var(--border-email);"></div> Email / Gmail action</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:var(--node-weekly); border-left-color:var(--border-weekly);"></div> Scheduled maintenance</div>
+</div>
+
+<div class="pipeline">
+
+  <!-- ── INPUT SOURCES ── -->
+  <div class="stage">
+    <div class="stage-label">Inputs (continuous)</div>
+    <div class="stage-nodes">
+      <div class="node node-input">
+        <div class="node-title">📸 Screenshots</div>
+        <div class="node-sub">LinkedIn screenshots → <code>data/inputs/images/</code></div>
+      </div>
+      <div class="node node-input">
+        <div class="node-title">🔗 LinkedIn URLs</div>
+        <div class="node-sub">Post URLs → <code>data/inputs/linkedin_urls/</code></div>
+      </div>
+      <div class="node node-input">
+        <div class="node-title">📝 Manual Leads</div>
+        <div class="node-sub">Contact notes → <code>data/inputs/manual_contacts/</code></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+  <!-- ── COLLECTOR ── -->
+  <div class="stage">
+    <div class="stage-label">Collect · Mon/Wed/Fri 09:00</div>
+    <div class="stage-nodes">
+      <div class="node node-auto" style="min-width:340px; max-width:420px;">
+        <div class="node-title">🤖 collector</div>
+        <div class="node-sub">GPT-4o Vision extracts company/person/context from screenshots. Deduplicates by domain + person name. Merges all streams into master CSV.</div>
+        <span class="node-badge badge-auto">auto · Mon/Wed/Fri 09:00</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+  <!-- ── MASTER CSV ── -->
+  <div class="stage">
+    <div class="stage-label">Aggregated leads</div>
+    <div class="stage-nodes">
+      <div class="node node-output">
+        <div class="node-title">📄 master_input.csv</div>
+        <div class="node-sub">Single source of truth. 11 columns. One contact per row.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+  <!-- ── RANKING ── -->
+  <div class="stage">
+    <div class="stage-label">On-demand campaign shortlist</div>
+    <div class="stage-nodes">
+      <div class="node node-manual" style="min-width:340px; max-width:420px;">
+        <div class="node-title">🏆 ranking_agent</div>
+        <div class="node-sub">GPT-4o scores leads 0–10 on impact fit, AI relevance, student ecosystem signal, timing. Score ≥ 5 → qualified shortlist.</div>
+        <span class="node-badge badge-manual">manual · <code>python agent.py rank</code></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+  <!-- ── BRANCH: qualified vs backlog ── -->
+  <div class="stage">
+    <div class="stage-label">Branch by score</div>
+    <div class="branch-wrap">
+
+      <!-- QUALIFIED BRANCH -->
+      <div class="branch-col">
+        <span class="branch-label branch-label-green">✅ Score ≥ 5 — Qualified</span>
+
+        <div class="node node-manual">
+          <div class="node-title">🔍 Apollo enrichment</div>
+          <div class="node-sub">Team enriches shortlisted leads in Apollo.io manually.</div>
+          <span class="node-badge badge-manual">manual</span>
+        </div>
+
+        <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+        <div class="node node-auto" style="min-width:170px;">
+          <div class="node-title">⬆️ upload_agent</div>
+          <div class="node-sub">Apollo CSV → Notion Accounts + Contacts DBs. Requires <code>--sender</code>.</div>
+          <span class="node-badge badge-manual">manual · <code>agent.py upload</code></span>
+        </div>
+
+        <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+        <div class="node node-auto" style="min-width:170px; position:relative;">
+          <div class="node-title">✍️ copywriter_agent</div>
+          <div class="node-sub">Generates LinkedIn cold, LinkedIn follow-up, email subject + body. Injects Notion iterations learnings automatically.</div>
+          <span class="node-badge badge-auto">auto · Mon 09:10</span>
+        </div>
+        <div class="annotation">↳ reads <em>Notion Iterations</em> before each run</div>
+
+        <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+        <!-- COPYWRITER OUTPUTS -->
+        <div class="stage-nodes" style="gap:8px;">
+          <div class="node node-output" style="min-width:130px; max-width:160px;">
+            <div class="node-title">📋 Notion copy</div>
+            <div class="node-sub">LinkedIn + email messages written to Contact pages.</div>
+          </div>
+          <div class="node node-email" style="min-width:130px; max-width:160px;">
+            <div class="node-title">📧 Gmail drafts</div>
+            <div class="node-sub">Draft per contact in <code>partnerships@</code> inbox.</div>
+            <span class="node-badge badge-email">auto</span>
+          </div>
+        </div>
+
+        <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+        <div class="node node-manual">
+          <div class="node-title">👀 Review &amp; send</div>
+          <div class="node-sub">Team reviews Gmail drafts + Notion copy, edits if needed, sends manually.</div>
+          <span class="node-badge badge-manual">manual</span>
+        </div>
+
+        <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
+
+        <div class="node node-auto" style="min-width:170px;">
+          <div class="node-title">🔗 linkedin_manager</div>
+          <div class="node-sub">Parses LinkedIn network HTML, matches Notion contacts, detects new connections, drafts follow-ups.</div>
+          <span class="node-badge badge-manual">manual · <code>agent.py linkedin</code></span>
+        </div>
+      </div>
+
+      <!-- BACKLOG BRANCH -->
+      <div class="branch-col" style="max-width:200px;">
+        <span class="branch-label branch-label-orange">⏳ Score &lt; 5 — Backlog</span>
+
+        <div class="node node-output" style="min-width:140px;">
+          <div class="node-title">📂 backlog.csv</div>
+          <div class="node-sub">Re-scored every ranking run until they qualify or are filtered.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="connector" style="margin-top:20px;"><div class="vline"></div></div>
+  <div class="branch-divider"></div>
+
+  <!-- ── FEEDBACK LOOP ── -->
+  <div class="stage" style="margin-top:10px;">
+    <div class="stage-label">Feedback &amp; maintenance (scheduled / on demand)</div>
+    <div class="stage-nodes">
+
+      <div class="node node-weekly">
+        <div class="node-title">💬 feedback_agent</div>
+        <div class="node-sub">Reads outcomes + Notion iterations. Updates <code>outreach_learnings.md</code>. Marks iterations Processed ✅.</div>
+        <span class="node-badge badge-weekly">Mon 11:00 + 16:00</span>
+      </div>
+
+      <div class="node node-weekly">
+        <div class="node-title">🔎 supervisor</div>
+        <div class="node-sub">Generates weekly PDF audit: API costs, file integrity, lead pipeline analytics.</div>
+        <span class="node-badge badge-manual">manual · <code>agent.py supervisor</code></span>
+      </div>
+
+      <div class="node node-weekly">
+        <div class="node-title">🧹 notion_cleanup</div>
+        <div class="node-sub">Auto-fills missing domains/account types. Interactive duplicate merge.</div>
+        <span class="node-badge badge-weekly">Mon 10:00 + 15:00</span>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /pipeline -->
+
+<hr>
+
 <h2>1. What This Infrastructure Does</h2>
 <p>This repo turns raw partnership signals into ready-to-send outreach:</p>
 <ol>
-<li><strong>Collect input</strong> from LinkedIn screenshots, LinkedIn URLs, and manual contact notes.</li>
-<li><strong>Create a top leads report on demand</strong> when the team wants a new campaign shortlist.</li>
-<li><strong>Enrich selected leads in Apollo</strong> manually.</li>
-<li><strong>Upload Apollo exports into Notion</strong> with an explicit campaign sender.</li>
-<li><strong>Generate outreach copy</strong> for that sender.</li>
-<li><strong>Review LinkedIn connection/follow-up actions</strong> when requested.</li>
+  <li><strong>Collect input</strong> from LinkedIn screenshots, LinkedIn URLs, and manual contact notes.</li>
+  <li><strong>Create a top leads report on demand</strong> when the team wants a new campaign shortlist.</li>
+  <li><strong>Enrich selected leads in Apollo</strong> manually.</li>
+  <li><strong>Upload Apollo exports into Notion</strong> with an explicit campaign sender.</li>
+  <li><strong>Generate outreach copy</strong> for that sender — and automatically create Gmail drafts in <code>partnerships@tum-socialaiclub.de</code>.</li>
+  <li><strong>Review LinkedIn connection/follow-up actions</strong> when requested.</li>
 </ol>
 <p>The system is intentionally no longer a fixed weekly campaign machine. Campaign actions should happen when someone deliberately asks for them.</p>
+
 <h3>What Each Agent Is Built On</h3>
 <table>
-<thead>
-<tr>
-<th>Agent / flow</th>
-<th>What it does</th>
-<th>Criteria and logic</th>
-</tr>
-</thead>
+<thead><tr><th>Agent / flow</th><th>What it does</th><th>Criteria and logic</th></tr></thead>
 <tbody>
-<tr>
-<td><code>collector</code></td>
-<td>Aggregates lead signals into <code>data/tables/master_input.csv</code>.</td>
-<td>Uses three input streams: LinkedIn screenshots in <code>data/inputs/images/</code>, LinkedIn post URLs in <code>data/inputs/linkedin_urls/</code>, and manual contact CSVs/notes in <code>data/inputs/manual_contacts/</code>. GPT-4o Vision extracts company/person/context from screenshots. LinkedIn URL processing extracts entities, domains, roles, and the specific trigger event. Deduplication uses normalized domain + person name, LinkedIn profile URLs, and a per-company cap so the master table stays campaign-safe.</td>
-</tr>
-<tr>
-<td><code>ranking_agent</code></td>
-<td>Creates the on-demand top leads report.</td>
-<td>Uses GPT-4o structured scoring from 0-10. The strongest fit is a company similar to proven pipeline successes, with positive social/ecological impact, AI or AI-talent relevance, and evidence of engaging with student organizations in Germany. DACH presence is only a tiebreaker, not a hard requirement. Leads with score &gt;= 5 qualify for the shortlist.</td>
-</tr>
-<tr>
-<td><code>ranking_agent</code> filters</td>
-<td>Prevents obvious bad leads from entering campaigns.</td>
-<td>Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized.</td>
-</tr>
-<tr>
-<td>Apollo enrichment</td>
-<td>Adds verified company/contact data before Notion upload.</td>
-<td>This step is manual in Apollo. It is used after ranking so the team does not spend enrichment effort on weak leads. Apollo exports should include account/contact identifiers, email, title, company domain, LinkedIn, employee/funding fields when available, and campaign-relevant contact rows.</td>
-</tr>
-<tr>
-<td><code>upload_agent</code></td>
-<td>Uploads Apollo CSVs into Notion Accounts and Contacts.</td>
-<td>Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended.</td>
-</tr>
-<tr>
-<td><code>copywriter_agent</code></td>
-<td>Generates campaign-specific outreach in Notion <strong>and creates Gmail drafts</strong>.</td>
-<td>Uses the shared outreach skill prompt plus processed <code>data/prompts/outreach_learnings.md</code>, active quality iterations from the Notion Iterations page, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts.</td>
-</tr>
-<tr>
-<td><code>linkedin_manager</code></td>
-<td>Reviews LinkedIn connection/follow-up actions.</td>
-<td>Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3-5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard.</td>
-</tr>
-<tr>
-<td><code>feedback_agent</code></td>
-<td>Turns outcome data into prompt learnings.</td>
-<td>Reads enough resolved outcomes, analyzes what copy worked or failed, and distills reusable guidance into <code>data/prompts/outreach_learnings.md</code> for future copywriter runs.</td>
-</tr>
+<tr><td><code>collector</code></td><td>Aggregates lead signals into <code>data/tables/master_input.csv</code>.</td><td>Uses three input streams: LinkedIn screenshots in <code>data/inputs/images/</code>, LinkedIn post URLs in <code>data/inputs/linkedin_urls/</code>, and manual contact CSVs/notes in <code>data/inputs/manual_contacts/</code>. GPT-4o Vision extracts company/person/context from screenshots. LinkedIn URL processing extracts entities, domains, roles, and the specific trigger event. Deduplication uses normalized domain + person name, LinkedIn profile URLs, and a per-company cap so the master table stays campaign-safe.</td></tr>
+<tr><td><code>ranking_agent</code></td><td>Creates the on-demand top leads report.</td><td>Uses GPT-4o structured scoring from 0–10. The strongest fit is a company similar to proven pipeline successes, with positive social/ecological impact, AI or AI-talent relevance, and evidence of engaging with student organizations in Germany. DACH presence is only a tiebreaker, not a hard requirement. Leads with score ≥ 5 qualify for the shortlist.</td></tr>
+<tr><td><code>ranking_agent</code> filters</td><td>Prevents obvious bad leads from entering campaigns.</td><td>Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized.</td></tr>
+<tr><td>Apollo enrichment</td><td>Adds verified company/contact data before Notion upload.</td><td>This step is manual in Apollo. It is used after ranking so the team does not spend enrichment effort on weak leads. Apollo exports should include account/contact identifiers, email, title, company domain, LinkedIn, employee/funding fields when available, and campaign-relevant contact rows.</td></tr>
+<tr><td><code>upload_agent</code></td><td>Uploads Apollo CSVs into Notion Accounts and Contacts.</td><td>Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended.</td></tr>
+<tr><td><code>copywriter_agent</code></td><td>Generates campaign-specific outreach in Notion <strong>and creates Gmail drafts</strong>.</td><td>Uses the shared outreach skill prompt plus processed <code>data/prompts/outreach_learnings.md</code>, reads unprocessed iterations from the Notion Iterations page and injects them into the prompt, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address. After a successful run it marks the iterations as Processed ✅. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts.</td></tr>
+<tr><td><code>linkedin_manager</code></td><td>Reviews LinkedIn connection/follow-up actions.</td><td>Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3–5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard.</td></tr>
+<tr><td><code>feedback_agent</code></td><td>Turns outcome data and manual copywriter iterations into prompt learnings.</td><td>Reads resolved outcomes, analyzes A/B test results, scans the Notion Iterations page, distills reusable guidance into <code>data/prompts/outreach_learnings.md</code>, and moves processed iteration notes into the Processed section.</td></tr>
 </tbody>
 </table>
+
 <h3>Strategic Ranking Criteria Details</h3>
 <table>
-<thead>
-<tr>
-<th>Criterion</th>
-<th>High score means</th>
-<th>Medium score means</th>
-<th>Low/disqualify means</th>
-</tr>
-</thead>
+<thead><tr><th>Criterion</th><th>High score means</th><th>Medium score means</th><th>Low/disqualify means</th></tr></thead>
 <tbody>
-<tr>
-<td>Impact fit</td>
-<td>Clear social, humanitarian, ecological, or innovation mission; mission aligns with AI for Good.</td>
-<td>General tech/innovation relevance but weaker impact story.</td>
-<td>No impact, AI, or ecological connection.</td>
-</tr>
-<tr>
-<td>AI / AI-talent relevance</td>
-<td>Uses AI, sells AI, needs AI builders, or has AI initiatives where TUM Social AI talent is credible.</td>
-<td>Tech-forward but not clearly AI-led.</td>
-<td>Traditional industry with no innovation or AI angle.</td>
-</tr>
-<tr>
-<td>Student ecosystem signal</td>
-<td>Collaborates with student organizations, hires interns/juniors, sponsors hackathons, joins pitch events, or appears in Munich/DACH tech events.</td>
-<td>Some event/startup ecosystem signal but not student-specific.</td>
-<td>Student organization itself, university club, or peer initiative. These score 0.</td>
-</tr>
-<tr>
-<td>Similarity to proven pipeline wins</td>
-<td>Looks like companies that already reached engaged or further in Workflow campaigns.</td>
-<td>Similar sector but weaker trigger or less obvious budget/talent need.</td>
-<td>No resemblance to historical successes.</td>
-</tr>
-<tr>
-<td>Timing / trigger</td>
-<td>Strong reason to reach out now: event, hiring, funding, program launch, partnership, speaker role, or campaign-relevant news.</td>
-<td>Generic but plausible company context.</td>
-<td>No trigger and no clear reason for outreach.</td>
-</tr>
+<tr><td>Impact fit</td><td>Clear social, humanitarian, ecological, or innovation mission; mission aligns with AI for Good.</td><td>General tech/innovation relevance but weaker impact story.</td><td>No impact, AI, or ecological connection.</td></tr>
+<tr><td>AI / AI-talent relevance</td><td>Uses AI, sells AI, needs AI builders, or has AI initiatives where TUM Social AI talent is credible.</td><td>Tech-forward but not clearly AI-led.</td><td>Traditional industry with no innovation or AI angle.</td></tr>
+<tr><td>Student ecosystem signal</td><td>Collaborates with student organizations, hires interns/juniors, sponsors hackathons, joins pitch events, or appears in Munich/DACH tech events.</td><td>Some event/startup ecosystem signal but not student-specific.</td><td>Student organization itself, university club, or peer initiative. These score 0.</td></tr>
+<tr><td>Similarity to proven pipeline wins</td><td>Looks like companies that already reached engaged or further in Workflow campaigns.</td><td>Similar sector but weaker trigger or less obvious budget/talent need.</td><td>No resemblance to historical successes.</td></tr>
+<tr><td>Timing / trigger</td><td>Strong reason to reach out now: event, hiring, funding, program launch, partnership, speaker role, or campaign-relevant news.</td><td>Generic but plausible company context.</td><td>No trigger and no clear reason for outreach.</td></tr>
 </tbody>
 </table>
 <p>Human review still matters. The ranking agent creates a campaign shortlist, not a final partnership decision.</p>
-<hr />
+
+<hr>
+
 <h2>2. What You Need</h2>
 <p>You do <strong>not</strong> need coding knowledge. You need:</p>
 <ul>
-<li>One agentic coding environment: <strong>Codex</strong>, <strong>Claude Code</strong>, or <strong>Antigravity</strong>.</li>
-<li>A local clone of this repository.</li>
-<li>Python 3.9+.</li>
-<li>Access to the shared Notion workspace and the required databases.</li>
-<li>An OpenAI API key or a vibe-coding environment license. Ask Nicolas if you need to use his OpenAI credits.</li>
-<li>Optional: Gmail app password if you want email reports sent from your laptop.</li>
+  <li>One agentic coding environment: <strong>Codex</strong>, <strong>Claude Code</strong>, or <strong>Antigravity</strong>.</li>
+  <li>A local clone of this repository.</li>
+  <li>Python 3.9+.</li>
+  <li>Access to the shared Notion workspace and the required databases.</li>
+  <li>An OpenAI API key or a vibe-coding environment license. Ask Nicolas if you need to use his OpenAI credits.</li>
+  <li>Optional: Gmail app password if you want email reports sent from your laptop.</li>
 </ul>
+
 <h3>API Cost Basics</h3>
 <ul>
-<li><strong>Running existing agents</strong> is usually low cost. Costs mostly come from OpenAI calls during lead scoring, copywriting, feedback analysis, and screenshot parsing.</li>
-<li><strong>Changing or building agents</strong> costs more because your coding environment uses model calls while editing, debugging, and testing.</li>
-<li>The agents currently use OpenAI API credits for their own AI work. The coding environment may have separate billing depending on Codex, Claude Code, or Antigravity.</li>
+  <li><strong>Running existing agents</strong> is usually low cost. Costs mostly come from OpenAI calls during lead scoring, copywriting, feedback analysis, and screenshot parsing.</li>
+  <li><strong>Changing or building agents</strong> costs more because your coding environment uses model calls while editing, debugging, and testing.</li>
+  <li>The agents currently use OpenAI API credits for their own AI work. The coding environment may have separate billing depending on Codex, Claude Code, or Antigravity.</li>
 </ul>
-<hr />
+
+<hr>
+
 <h2>3. Setup From GitHub</h2>
+
 <h3>macOS / Linux</h3>
-<pre><code class="language-bash">git clone https://github.com/nicopaul19/tum-sales-agent.git
+<pre><code>git clone https://github.com/nicopaul19/tum-sales-agent.git
 cd tum-sales-agent
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-cp .env.template .env
-</code></pre>
+cp .env.template .env</code></pre>
+
 <h3>Windows PowerShell</h3>
-<pre><code class="language-powershell">git clone https://github.com/nicopaul19/tum-sales-agent.git
+<pre><code>git clone https://github.com/nicopaul19/tum-sales-agent.git
 cd tum-sales-agent
 py -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-copy .env.template .env
-</code></pre>
+copy .env.template .env</code></pre>
+
 <h3>Required <code>.env</code> Values</h3>
-<pre><code class="language-bash">OPENAI_API_KEY=
+<pre><code>OPENAI_API_KEY=
 NOTION_TOKEN=
 NOTION_DB_ACCOUNTS_ID=
 NOTION_DB_CONTACTS_ID=
@@ -178,196 +480,95 @@ GMAIL_APP_PASSWORD=
 REPORT_RECIPIENT_EMAIL=
 RANKING_REPORT_RECIPIENTS=
 FEEDBACK_REPORT_RECIPIENTS=
-DEFAULT_CAMPAIGN_SENDER=
-</code></pre>
+DEFAULT_CAMPAIGN_SENDER=</code></pre>
 <p><code>DEFAULT_CAMPAIGN_SENDER</code> is optional. If it is empty, upload and copywriter commands ask who will execute the campaign. In non-interactive runs, pass <code>--sender "Full Name"</code>.</p>
-<p>Important: the Contacts database ID is correct, but the current Notion integration returns a 404 unless the Contacts DB is shared with the integration. Share both Accounts and Contacts with the integration named <strong>Claude Code Integration</strong> or the active Notion integration token.</p>
+<p><strong>Important:</strong> the Contacts database ID is correct, but the current Notion integration returns a 404 unless the Contacts DB is shared with the integration. Share both Accounts and Contacts with the integration named <strong>Claude Code Integration</strong> or the active Notion integration token.</p>
+
 <h3>Verify Setup</h3>
-<pre><code class="language-bash">python agent.py collect
-python agent.py --help
-</code></pre>
-<hr />
+<pre><code>python agent.py collect
+python agent.py --help</code></pre>
+
+<hr>
+
 <h2>4. Command-First Campaign Lifecycle</h2>
 <p>Use <code>agent.py</code> for all environments. It works in Codex, Claude Code, Antigravity, macOS Terminal, and Windows PowerShell.</p>
 <table>
-<thead>
-<tr>
-<th>Step</th>
-<th>When</th>
-<th>Command</th>
-</tr>
-</thead>
+<thead><tr><th>Step</th><th>When</th><th>Command</th></tr></thead>
 <tbody>
-<tr>
-<td>Process new inputs</td>
-<td>After saving screenshots, URLs, or manual leads</td>
-<td><code>python agent.py collect</code></td>
-</tr>
-<tr>
-<td>Create top leads report</td>
-<td>When the team wants a new campaign shortlist</td>
-<td><code>python agent.py rank</code></td>
-</tr>
-<tr>
-<td>Upload Apollo export</td>
-<td>After Apollo enrichment</td>
-<td><code>python agent.py upload --csv "/path/to/apollo.csv" --sender "Full Name"</code></td>
-</tr>
-<tr>
-<td>Generate outreach</td>
-<td>After upload</td>
-<td><code>python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code></td>
-</tr>
-<tr>
-<td>LinkedIn review</td>
-<td>After saving LinkedIn network HTML</td>
-<td><code>python agent.py linkedin --connections-file "/path/to/network.html"</code></td>
-</tr>
-<tr>
-<td>Infrastructure audit</td>
-<td>On request</td>
-<td><code>python agent.py supervisor</code></td>
-</tr>
-<tr>
-<td>Feedback analysis</td>
-<td>On request, after enough outcomes</td>
-<td><code>python agent.py feedback</code></td>
-</tr>
-<tr>
-<td>Notion cleanup</td>
-<td>On request</td>
-<td><code>python agent.py cleanup --all</code></td>
-</tr>
+<tr><td>Process new inputs</td><td>After saving screenshots, URLs, or manual leads</td><td><code>python agent.py collect</code></td></tr>
+<tr><td>Create top leads report</td><td>When the team wants a new campaign shortlist</td><td><code>python agent.py rank</code></td></tr>
+<tr><td>Upload Apollo export</td><td>After Apollo enrichment</td><td><code>python agent.py upload --csv "/path/to/apollo.csv" --sender "Full Name"</code></td></tr>
+<tr><td>Generate outreach</td><td>After upload</td><td><code>python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code></td></tr>
+<tr><td>LinkedIn review</td><td>After saving LinkedIn network HTML</td><td><code>python agent.py linkedin --connections-file "/path/to/network.html"</code></td></tr>
+<tr><td>Infrastructure audit</td><td>On request</td><td><code>python agent.py supervisor</code></td></tr>
+<tr><td>Feedback analysis</td><td>On request, after enough outcomes</td><td><code>python agent.py feedback</code></td></tr>
+<tr><td>Notion cleanup</td><td>On request</td><td><code>python agent.py cleanup --all</code></td></tr>
 </tbody>
 </table>
+
 <h3>Campaign Sender</h3>
 <p>Every campaign needs a sender because the copy should sound like the teammate who will actually send it.</p>
-<p>Examples:</p>
-<pre><code class="language-bash">python agent.py upload --csv &quot;apollo_export.csv&quot; --sender &quot;Nicolas Paul&quot;
-python agent.py copywrite --campaign Workflow_0505 --sender &quot;Nicolas Paul&quot;
-</code></pre>
+<pre><code>python agent.py upload --csv "apollo_export.csv" --sender "Nicolas Paul"
+python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code></pre>
 <p>The generated messages use:</p>
 <ul>
-<li>LinkedIn sign-off: <code>Best, {first_name}</code></li>
-<li>Email sign-off: <code>{full_name}</code></li>
+  <li>LinkedIn sign-off: <code>Best, {first_name}</code></li>
+  <li>Email sign-off: <code>{full_name}</code></li>
 </ul>
-<hr />
+
+<hr>
+
 <h2>5. Operating Cadence</h2>
 <p>Put these as recurring calendar blockers, but execute campaign actions only when useful.</p>
 <table>
-<thead>
-<tr>
-<th>Cadence</th>
-<th>Blocker</th>
-<th>Action</th>
-</tr>
-</thead>
+<thead><tr><th>Cadence</th><th>Blocker</th><th>Action</th></tr></thead>
 <tbody>
-<tr>
-<td>Continuous</td>
-<td>LinkedIn input capture</td>
-<td>Save promising posts, profiles, screenshots, and manual contacts as you browse.</td>
-</tr>
-<tr>
-<td>On campaign start</td>
-<td>Input cleanup + top leads + Apollo</td>
-<td>Run <code>python agent.py collect</code>, scan inputs, run <code>python agent.py rank</code>, review the shortlist, then enrich selected leads in Apollo.</td>
-</tr>
-<tr>
-<td>After Apollo</td>
-<td>Upload + copywriter</td>
-<td>Run upload with <code>--sender</code>, then copywrite for the campaign.</td>
-</tr>
-<tr>
-<td>1x per week during active campaign</td>
-<td>LinkedIn follow-up review</td>
-<td>Save the LinkedIn connections page and run <code>python agent.py linkedin --connections-file ...</code>.</td>
-</tr>
-<tr>
-<td>After outcomes accumulate</td>
-<td>Copywriter feedback</td>
-<td>Add examples to the Notion improvement log; run <code>python agent.py feedback</code> when there is enough data.</td>
-</tr>
+<tr><td>Continuous</td><td>LinkedIn input capture</td><td>Save promising posts, profiles, screenshots, and manual contacts as you browse.</td></tr>
+<tr><td>On campaign start</td><td>Input cleanup + top leads + Apollo</td><td>Run <code>python agent.py collect</code>, scan inputs, run <code>python agent.py rank</code>, review the shortlist, then enrich selected leads in Apollo.</td></tr>
+<tr><td>After Apollo</td><td>Upload + copywriter</td><td>Run upload with <code>--sender</code>, then copywrite for the campaign.</td></tr>
+<tr><td>1x per week during active campaign</td><td>LinkedIn follow-up review</td><td>Save the LinkedIn connections page and run <code>python agent.py linkedin --connections-file ...</code>.</td></tr>
+<tr><td>After outcomes accumulate</td><td>Copywriter feedback</td><td>Add examples to the Notion improvement log; run <code>python agent.py feedback</code> when there is enough data.</td></tr>
 </tbody>
 </table>
 <p>Recommended calendar blocks:</p>
 <ul>
-<li><strong>60 min input cleanup + campaign shortlist + Apollo enrichment</strong></li>
-<li><strong>30 min outreach sending</strong></li>
-<li><strong>20 min LinkedIn follow-up review</strong></li>
+  <li><strong>60 min</strong> input cleanup + campaign shortlist + Apollo enrichment</li>
+  <li><strong>30 min</strong> outreach sending</li>
+  <li><strong>20 min</strong> LinkedIn follow-up review</li>
 </ul>
-<hr />
+
+<hr>
+
 <h2>6. Current Automation Policy</h2>
 <table>
-<thead>
-<tr>
-<th>Job</th>
-<th>Schedule</th>
-<th>Purpose</th>
-</tr>
-</thead>
+<thead><tr><th>Job</th><th>Schedule</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr>
-<td><code>com.tumsocialai.sales-collector</code></td>
-<td>Mon/Wed/Fri 09:00 + 14:00</td>
-<td>Processes incoming screenshots, URLs, manual notes.</td>
-</tr>
-<tr>
-<td><code>com.tumsocialai.project-applications</code></td>
-<td>Monday 09:30</td>
-<td>Processes project application intake.</td>
-</tr>
-<tr>
-<td><code>com.tumsocialai.requirements-enrichment</code></td>
-<td>Monday 07:00 + 12:00</td>
-<td>Enriches requirements/applications.</td>
-</tr>
-<tr>
-<td><code>com.tumsocialai.notion-cleanup</code></td>
-<td>Monday 10:00 + 15:00</td>
-<td>Fills missing domains/account types automatically; duplicate merges remain manual.</td>
-</tr>
+<tr><td><code>com.tumsocialai.sales-collector</code></td><td>Mon/Wed/Fri 09:00 + 14:00</td><td>Processes incoming screenshots, URLs, manual notes.</td></tr>
+<tr><td><code>com.tumsocialai.project-applications</code></td><td>Monday 09:30</td><td>Processes project application intake.</td></tr>
+<tr><td><code>com.tumsocialai.requirements-enrichment</code></td><td>Monday 07:00 + 12:00</td><td>Enriches requirements/applications.</td></tr>
+<tr><td><code>com.tumsocialai.notion-cleanup</code></td><td>Monday 10:00 + 15:00</td><td>Fills missing domains/account types automatically; duplicate merges remain manual.</td></tr>
+<tr><td><code>com.tumsocialai.copywriter</code></td><td>Monday 09:10</td><td>Runs copywriter_agent: reads Notion iterations, generates outreach, creates Gmail drafts, marks iterations Processed ✅.</td></tr>
+<tr><td><code>com.tumsocialai.feedback-agent</code></td><td>Monday 11:00 + 16:00</td><td>Analyzes outreach outcomes, A/B results, and Notion copywriter iterations.</td></tr>
 </tbody>
 </table>
+
 <p>Campaign/action jobs that run on demand:</p>
 <table>
-<thead>
-<tr>
-<th>Job</th>
-<th>Status</th>
-</tr>
-</thead>
+<thead><tr><th>Job</th><th>Status</th></tr></thead>
 <tbody>
-<tr>
-<td><code>com.tumsocialai.sales-ranking</code></td>
-<td>Manual (<code>python agent.py rank</code>)</td>
-</tr>
-<tr>
-<td><code>com.tumsocialai.linkedin-manager</code></td>
-<td>Manual (<code>python agent.py linkedin ...</code>)</td>
-</tr>
-<tr>
-<td><code>com.tumsocialai.sales-supervisor</code></td>
-<td>Manual (<code>python agent.py supervisor</code>)</td>
-</tr>
-<tr>
-<td><code>com.tumsocialai.feedback-agent</code></td>
-<td>Manual (<code>python agent.py feedback</code>)</td>
-</tr>
-<tr>
-<td><code>com.tumsocialai.enrichment</code></td>
-<td>Manual</td>
-</tr>
-<tr>
-<td><code>com.tumsocialai.copywriter</code></td>
-<td>Manual (<code>python agent.py copywrite --campaign ... --sender ...</code>)</td>
-</tr>
+<tr><td><code>com.tumsocialai.sales-ranking</code></td><td>Manual (<code>python agent.py rank</code>)</td></tr>
+<tr><td><code>com.tumsocialai.linkedin-manager</code></td><td>Manual (<code>python agent.py linkedin ...</code>)</td></tr>
+<tr><td><code>com.tumsocialai.sales-supervisor</code></td><td>Manual (<code>python agent.py supervisor</code>)</td></tr>
+<tr><td><code>com.tumsocialai.enrichment</code></td><td>Manual</td></tr>
+<tr><td><code>com.tumsocialai.copywriter</code></td><td>Manual (<code>python agent.py copywrite --campaign ... --sender ...</code>)</td></tr>
 </tbody>
 </table>
 <p>On macOS, Quick Actions are optional convenience tools. They are not required for teammates using Codex, Claude Code, Antigravity, or Windows.</p>
-<hr />
+
+<hr>
+
 <h2>7. Files And Data Flow</h2>
-<pre><code class="language-text">LinkedIn screenshots / URLs / manual leads
+<pre><code>LinkedIn screenshots / URLs / manual leads
   -&gt; data/inputs/
   -&gt; agent.py collect
   -&gt; data/tables/master_input.csv
@@ -377,72 +578,84 @@ python agent.py copywrite --campaign Workflow_0505 --sender &quot;Nicolas Paul&q
   -&gt; agent.py upload --csv ... --sender ...
   -&gt; Notion Accounts / Contacts
   -&gt; agent.py copywrite --campaign ... --sender ...
-  -&gt; outreach messages in Notion
-</code></pre>
+  -&gt; outreach messages in Notion + Gmail drafts in partnerships@tum-socialaiclub.de</code></pre>
 <p>The CSV filenames still contain <code>weekly_</code> for backward compatibility. Treat them as on-demand campaign shortlist files.</p>
-<hr />
+
+<hr>
+
 <h2>8. Copywriter Improvement Loop</h2>
-<p>The copywriter runs <strong>automatically every Monday at 09:10</strong> (<code>com.tumsocialai.copywriter</code> launchd job). Each run:</p>
+<p>The copywriter agent runs on Monday at 09:10 and owns the full improvement loop each run:</p>
 <ol>
-<li>Reads unprocessed iterations from the <a href="https://www.notion.so/Iterations-on-Strategic-Partnersh-Copywriter-Agent-366a0c6e616880f8ba37ffa95d90b2fa">Notion Iterations page</a></li>
-<li>Injects them into the GPT-4o prompt so the mistakes are not repeated</li>
-<li>Writes outreach copy to Notion contacts</li>
-<li>Creates Gmail drafts in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email</li>
-<li>Moves processed iterations into the <strong>Processed ✅</strong> toggle on the Notion page</li>
+  <li>Reads unprocessed iterations from the <a href="https://www.notion.so/Iterations-on-Strategic-Partnersh-Copywriter-Agent-366a0c6e616880f8ba37ffa95d90b2fa">Notion Iterations page</a></li>
+  <li>Injects them into the copywriting prompt so the current run benefits immediately</li>
+  <li>Generates outreach copy and writes it to Notion Contact pages</li>
+  <li>Creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address</li>
+  <li>Marks the consumed iterations as <strong>Processed ✅</strong> in Notion automatically</li>
 </ol>
+<p>The weekly feedback agent (<code>com.tumsocialai.feedback-agent</code>, Mon 11:00 + 16:00) also reads outcome data and A/B test statistics and writes consolidated guidance to <code>data/prompts/outreach_learnings.md</code>, which the copywriter agent consumes on its next run.</p>
+
 <h3>Adding a New Iteration (When You Flag a Bad Draft)</h3>
 <p>Open the <a href="https://www.notion.so/Iterations-on-Strategic-Partnersh-Copywriter-Agent-366a0c6e616880f8ba37ffa95d90b2fa">Iterations page</a> and add a new toggle inside <strong>Not yet processed ❌</strong> with:</p>
 <ul>
-<li><strong>Toggle title:</strong> short description of the issue (e.g. "Too generic — no reference to trigger")</li>
-<li><strong>Inside the toggle:</strong></li>
-<li>Bad/generated snippet</li>
-<li>Improved version</li>
-<li>Why the improved version is better</li>
+  <li><strong>Toggle title:</strong> short description of the issue (e.g. "Too generic — no reference to trigger")</li>
+  <li><strong>Inside the toggle:</strong>
+    <ul>
+      <li>Bad/generated snippet</li>
+      <li>Improved version</li>
+      <li>Why the improved version is better</li>
+    </ul>
+  </li>
 </ul>
-<p>The agent will pick it up on the next Monday run and mark it as <strong>Processed ✅</strong> automatically.</p>
+<p>The copywriter agent will pick it up on its next Monday run and inject it into the prompt immediately, then mark it as <strong>Processed ✅</strong> automatically after the run succeeds.</p>
+
 <h3>Gmail Draft Review</h3>
 <p>After every copywriter run, drafts appear in <code>partnerships@tum-socialaiclub.de</code>:</p>
 <ol>
-<li>Log into Gmail as <code>partnerships@tum-socialaiclub.de</code></li>
-<li>Open <strong>Drafts</strong> — one draft per contact with a known email</li>
-<li>Review, edit if needed, and send</li>
+  <li>Log into Gmail as <code>contact@tum-socialaiclub.de</code> (partnerships@ is a group alias inside this account)</li>
+  <li>Open <strong>Drafts</strong> — one draft per contact with a known email</li>
+  <li>Review, edit if needed, and send</li>
 </ol>
 <p>The draft subject and body match exactly what was written to Notion.</p>
+
 <h3>Gmail OAuth (One-Time Setup Per Machine)</h3>
 <p>The OAuth token is already set up on Nicolas's machine (<code>gmail_token.json</code>). If you're running the agent from a different machine:</p>
-<pre><code class="language-bash">python setup_gmail_auth.py
-</code></pre>
+<pre><code>python setup_gmail_auth.py</code></pre>
 <p>This opens a browser — log in as <code>contact@tum-socialaiclub.de</code> and grant access. The token is saved locally and never committed to Git.</p>
-<hr />
+
+<hr>
+
 <h2>9. Troubleshooting</h2>
+
 <h3>Contacts DB 404</h3>
 <p>The database ID can be correct and still fail if the Notion integration is not invited to the database.</p>
 <p>Fix:</p>
 <ol>
-<li>Open the Contacts DB in Notion.</li>
-<li>Click <strong>Share</strong>.</li>
-<li>Invite the active integration, currently shown by Notion as <strong>Claude Code Integration</strong>.</li>
-<li>Re-run the command.</li>
+  <li>Open the Contacts DB in Notion.</li>
+  <li>Click <strong>Share</strong>.</li>
+  <li>Invite the active integration, currently shown by Notion as <strong>Claude Code Integration</strong>.</li>
+  <li>Re-run the command.</li>
 </ol>
 <p>Until this is fixed, the agents use Accounts DB fallback fields where possible.</p>
+
 <h3>Upload/copywriter asks for a sender</h3>
 <p>Pass it explicitly:</p>
-<pre><code class="language-bash">python agent.py upload --csv &quot;apollo.csv&quot; --sender &quot;Full Name&quot;
-python agent.py copywrite --campaign Workflow_DDMM --sender &quot;Full Name&quot;
-</code></pre>
+<pre><code>python agent.py upload --csv "apollo.csv" --sender "Full Name"
+python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code></pre>
 <p>Or set:</p>
-<pre><code class="language-bash">DEFAULT_CAMPAIGN_SENDER=Full Name
-</code></pre>
+<pre><code>DEFAULT_CAMPAIGN_SENDER=Full Name</code></pre>
+
 <h3>macOS Google Drive permission errors</h3>
-<p>If scheduled intake jobs fail with “Operation not permitted”, grant <code>/bin/bash</code> Full Disk Access:</p>
-<p>System Settings -&gt; Privacy &amp; Security -&gt; Full Disk Access -&gt; add <code>/bin/bash</code></p>
+<p>If scheduled intake jobs fail with "Operation not permitted", grant <code>/bin/bash</code> Full Disk Access:</p>
+<p>System Settings → Privacy &amp; Security → Full Disk Access → add <code>/bin/bash</code></p>
+
 <h3>LinkedIn parser finds no connections</h3>
 <p>Use a saved LinkedIn connections/network HTML file:</p>
-<pre><code class="language-bash">python agent.py linkedin --dry-run --connections-file &quot;data/inputs/linkedin_dump/network_YYYYMMDD_HHMMSS.html&quot;
-</code></pre>
-<hr />
+<pre><code>python agent.py linkedin --dry-run --connections-file "data/inputs/linkedin_dump/network_YYYYMMDD_HHMMSS.html"</code></pre>
+
+<hr>
+
 <h2>10. Quick Reference</h2>
-<pre><code class="language-bash"># Universal runner
+<pre><code># Universal runner
 python agent.py --help
 
 # Intake
@@ -452,20 +665,20 @@ python agent.py collect
 python agent.py rank
 
 # Apollo upload
-python agent.py upload --csv &quot;apollo_export.csv&quot; --sender &quot;Full Name&quot;
+python agent.py upload --csv "apollo_export.csv" --sender "Full Name"
 
 # Copywriter
-python agent.py copywrite --campaign Workflow_DDMM --sender &quot;Full Name&quot;
-python agent.py copywrite --campaign Workflow_DDMM --sender &quot;Full Name&quot; --dry-run
+python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"
+python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name" --dry-run
 
 # LinkedIn review
-python agent.py linkedin --connections-file &quot;network.html&quot;
-python agent.py linkedin --dry-run --connections-file &quot;network.html&quot;
+python agent.py linkedin --connections-file "network.html"
+python agent.py linkedin --dry-run --connections-file "network.html"
 
 # Maintenance on demand
 python agent.py supervisor
 python agent.py feedback --dry-run
-python agent.py cleanup --all
-</code></pre>
+python agent.py cleanup --all</code></pre>
+
 </body>
 </html>

@@ -9,3 +9,4 @@ pydantic
 matplotlib
 fpdf2
 beautifulsoup4
+phonenumbers

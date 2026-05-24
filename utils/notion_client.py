@@ -1525,14 +1525,20 @@ def get_accounts_for_copywriting(
         person_name = _text("[Suspect] Contact Name").strip()
         linkedin_url = _url("[Suspect] Contact LinkedIn URL")
         email = _text("[Suspect] Contact Email").strip()
+        # Fallback: use General Email if no [Suspect] contact info is set
         if not person_name and not linkedin_url and not email:
-            continue
+            general_email = _text("General Email").strip()
+            if general_email:
+                email = general_email
+                person_name = ""   # will render as "there" / org-level greeting
+            else:
+                continue
 
         country_list = _multi_select("Country")
         contacts.append({
             "contact_page_id": account_page_id,
             "contact_storage": "account",
-            "person_name": person_name or "there",
+            "person_name": person_name or "",
             "email": email,
             "linkedin_url": linkedin_url,
             "job_title": _text("[Suspect] Job Title"),
