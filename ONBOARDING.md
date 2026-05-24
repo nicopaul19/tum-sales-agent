@@ -1,7 +1,7 @@
 # TUM Social AI — Strategic Partnerships Agents
 ## On-Demand Campaign Onboarding Guide
 
-**Last updated:** May 5, 2026  
+**Last updated:** May 24, 2026  
 **Audience:** TUM Social AI teammates running partnership campaigns from Codex, Claude Code, Antigravity, or a terminal.
 
 ---
@@ -28,7 +28,7 @@ The system is intentionally no longer a fixed weekly campaign machine. Campaign 
 | `ranking_agent` filters | Prevents obvious bad leads from entering campaigns. | Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized. |
 | Apollo enrichment | Adds verified company/contact data before Notion upload. | This step is manual in Apollo. It is used after ranking so the team does not spend enrichment effort on weak leads. Apollo exports should include account/contact identifiers, email, title, company domain, LinkedIn, employee/funding fields when available, and campaign-relevant contact rows. |
 | `upload_agent` | Uploads Apollo CSVs into Notion Accounts and Contacts. | Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended. |
-| `copywriter_agent` | Generates campaign-specific outreach in Notion. | Uses the shared outreach skill prompt plus processed `data/prompts/outreach_learnings.md`, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
+| `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus processed `data/prompts/outreach_learnings.md`, active quality iterations from the Notion Iterations page, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in `partnerships@tum-socialaiclub.de` for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
 | `linkedin_manager` | Reviews LinkedIn connection/follow-up actions. | Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3-5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard. |
 | `feedback_agent` | Turns outcome data into prompt learnings. | Reads enough resolved outcomes, analyzes what copy worked or failed, and distills reusable guidance into `data/prompts/outreach_learnings.md` for future copywriter runs. |
 
@@ -172,24 +172,23 @@ Recommended calendar blocks:
 
 ## 6. Current Automation Policy
 
-Only lightweight intake automation should stay scheduled:
-
-| Job | Status | Purpose |
+| Job | Schedule | Purpose |
 |---|---|---|
-| `com.tumsocialai.sales-collector` | Keep scheduled | Processes incoming screenshots, URLs, manual notes. |
-| `com.tumsocialai.project-applications` | Keep scheduled | Processes project application intake. |
-| `com.tumsocialai.requirements-enrichment` | Keep scheduled | Enriches requirements/applications. |
+| `com.tumsocialai.sales-collector` | Mon/Wed/Fri 09:00 | Processes incoming screenshots, URLs, manual notes. |
+| `com.tumsocialai.copywriter` | Monday 09:10 | Generates outreach copy + Gmail drafts, injects & clears Notion iterations. |
+| `com.tumsocialai.project-applications` | Scheduled | Processes project application intake. |
+| `com.tumsocialai.requirements-enrichment` | Scheduled | Enriches requirements/applications. |
 
-Campaign/action jobs should be manual:
+Campaign/action jobs that run on demand:
 
-| Job | New status |
+| Job | Status |
 |---|---|
-| `com.tumsocialai.sales-ranking` | Disabled |
-| `com.tumsocialai.linkedin-manager` | Disabled |
-| `com.tumsocialai.sales-supervisor` | Disabled |
-| `com.tumsocialai.feedback-agent` | Disabled |
-| `com.tumsocialai.notion-cleanup` | Disabled |
-| `com.tumsocialai.enrichment` | Disabled |
+| `com.tumsocialai.sales-ranking` | Manual (`python agent.py rank`) |
+| `com.tumsocialai.linkedin-manager` | Manual (`python agent.py linkedin ...`) |
+| `com.tumsocialai.sales-supervisor` | Manual (`python agent.py supervisor`) |
+| `com.tumsocialai.feedback-agent` | Manual (`python agent.py feedback`) |
+| `com.tumsocialai.notion-cleanup` | Manual (`python agent.py cleanup --all`) |
+| `com.tumsocialai.enrichment` | Manual |
 
 On macOS, Quick Actions are optional convenience tools. They are not required for teammates using Codex, Claude Code, Antigravity, or Windows.
 
@@ -217,22 +216,45 @@ The CSV filenames still contain `weekly_` for backward compatibility. Treat them
 
 ## 8. Copywriter Improvement Loop
 
-Use the Notion copywriter improvement log inside the Partnerships Agents page.
+The copywriter runs **automatically every Monday at 09:10** (`com.tumsocialai.copywriter` launchd job). Each run:
 
-Add each bad or low-quality message as an item under **not yet processed** with:
+1. Reads unprocessed iterations from the [Notion Iterations page](https://www.notion.so/Iterations-on-Strategic-Partnersh-Copywriter-Agent-366a0c6e616880f8ba37ffa95d90b2fa)
+2. Injects them into the GPT-4o prompt so the mistakes are not repeated
+3. Writes outreach copy to Notion contacts
+4. Creates Gmail drafts in `partnerships@tum-socialaiclub.de` for every contact with an email
+5. Moves processed iterations into the **Processed ✅** toggle on the Notion page
 
-- bad/generated snippet
-- improved version
-- why the improved version is better
-- campaign/contact context
+### Adding a New Iteration (When You Flag a Bad Draft)
 
-When processed, move it under **processed** and add the distilled learning to:
+Open the [Iterations page](https://www.notion.so/Iterations-on-Strategic-Partnersh-Copywriter-Agent-366a0c6e616880f8ba37ffa95d90b2fa) and add a new toggle inside **Not yet processed ❌** with:
+
+- **Toggle title:** short description of the issue (e.g. "Too generic — no reference to trigger")
+- **Inside the toggle:**
+  - Bad/generated snippet
+  - Improved version
+  - Why the improved version is better
+
+The agent will pick it up on the next Monday run and mark it as **Processed ✅** automatically.
+
+### Gmail Draft Review
+
+After every copywriter run, drafts appear in `partnerships@tum-socialaiclub.de`:
+
+1. Log into Gmail as `partnerships@tum-socialaiclub.de`
+2. Open **Drafts** — one draft per contact with a known email
+3. Review, edit if needed, and send
+
+The draft subject and body match exactly what was written to Notion.
+
+### Gmail OAuth (One-Time Setup Per Machine)
+
+The OAuth token is already set up on Nicolas's machine (`gmail_token.json`). If you're running the agent from a different machine:
 
 ```bash
-data/prompts/outreach_learnings.md
+python setup_gmail_auth.py
 ```
 
-The copywriter injects this file into future prompt runs.
+This opens a browser — log in as `contact@tum-socialaiclub.de` and grant access. The token is saved locally and never committed to Git.
 
 ---
 

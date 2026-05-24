@@ -42,6 +42,8 @@ from utils.notion_client import (
     update_account_outreach,
 )
 from utils.preflight import run_preflight
+from utils.gmail_client import create_draft as gmail_create_draft
+from utils.iterations_client import load_iterations, mark_iterations_processed
 
 console = Console()
 
@@ -51,6 +53,42 @@ LEARNINGS_PATH = Path(__file__).parent.parent / "data" / "prompts" / "outreach_l
 
 # Career page paths to try when fetching job openings
 CAREERS_PATHS = ["/careers", "/jobs", "/karriere", "/stellenangebote", "/join", "/open-positions", "/join-us"]
+
+# Countries where German outreach is used (DACH)
+DACH_COUNTRIES = {"germany", "austria", "switzerland", "deutschland", "österreich", "schweiz", "liechtenstein", "ch", "at", "de"}
+
+# Campaign-specific system prompt overrides
+# Injected AFTER the skill prompt when a matching campaign is active
+CAMPAIGN_OVERRIDES: dict[str, str] = {
+    "NGO_180526_InvoiceManagement": """
+
+## CAMPAIGN OVERRIDE — NGO Invoice Management (NGO_180526_InvoiceManagement)
+
+This campaign targets NGOs that distribute funds to LOCAL PARTNER ORGANIZATIONS in developing countries,
+which means they receive many invoices from those local partners and must validate/approve them.
+
+WE ARE OFFERING: TUM Social AI is building an AI invoice inspection & management tool together with
+Entreculturas (a Jesuit NGO active in 50+ countries, $650M+ combined budget). We want to test and
+improve this tool with more NGOs that have a similar operational model.
+
+KEY MESSAGING RULES for this campaign:
+- This is an EMAIL-ONLY outreach channel. Do NOT write LinkedIn messages — but still fill the
+  linkedin_first_cold and linkedin_follow_up fields with a shortened version of the email body.
+- Lead with: we're building an AI invoice inspection tool WITH Entreculturas and want to test it
+  with other NGOs that receive invoices from local partner organizations.
+- Frame it as: "we want to improve our AI models together with your organization" — collaborative,
+  not a product pitch.
+- Promise: once the model is production-ready, we will deploy it for them at ZERO COST because
+  we are a pro-bono student initiative from TUM.
+- Never say "we'll sell you" or imply a commercial relationship. It's purely pro-bono.
+- Keep it SHORT: email body max 80 words. Subject max 8 words.
+- CTA: "Would this be relevant for your team?" — always end with this relevance question.
+- If the NGO has no individual contact (person_name is empty or generic), address the email to
+  "Liebes [Org] Team" (German) or "Dear [Org] team" (English). Do NOT use "Hi there".
+- Entreculturas reference: mention Entreculturas as the existing partner we're building this with.
+  Frame it as proof of concept: "we're already piloting this with Entreculturas."
+""",
+}
 
 # Job titles that trigger careers page fetching (checked via substring match)
 CAREERS_FETCH_TITLES = {
@@ -245,7 +283,13 @@ def build_contact_prompt(contact: dict) -> str:
         lines.append("- Use this to craft a specific, relevant hook if their job openings match our talent pool")
 
     lines.append("\n## LANGUAGE")
-    lines.append("- Write ALL messages in English")
+    contact_country_lower = (country or "").lower().strip()
+    if contact_country_lower in DACH_COUNTRIES:
+        lines.append("- Write ALL messages in GERMAN (Deutsch)")
+        lines.append("- Use formal 'Sie' for NGO and institutional contacts")
+        lines.append("- Sign off emails with 'Viele Grüße' followed by sender name")
+    else:
+        lines.append("- Write ALL messages in English")
 
     lines.append("\n## INSTRUCTIONS")
     lines.append("- Follow the OUTREACH SKILL rules exactly")
@@ -260,7 +304,7 @@ def build_contact_prompt(contact: dict) -> str:
     return "\n".join(lines)
 
 
-def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant: str = "") -> OutreachMessages:
+def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant: str = "", campaign_id: str = "") -> OutreachMessages:
     """
     Call GPT-4o to generate 4 outreach messages for a contact.
 
@@ -275,8 +319,10 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
     """
     user_prompt = build_contact_prompt(contact)
 
-    # Build full system prompt: skill + variant addendum + learnings
+    # Build full system prompt: skill + campaign override + variant addendum + learnings
     full_system_prompt = skill_prompt
+    if campaign_id and campaign_id in CAMPAIGN_OVERRIDES:
+        full_system_prompt += CAMPAIGN_OVERRIDES[campaign_id]
     if variant in VARIANT_ADDENDA:
         full_system_prompt += VARIANT_ADDENDA[variant]
     learnings = load_learnings_prompt()
@@ -351,6 +397,12 @@ def run_copywriter(
     skill_prompt = load_skill_prompt()
     if not skill_prompt:
         return
+
+    # Load & inject quality iterations from Notion
+    iterations_injection, iterations_block_ids = load_iterations()
+    if iterations_injection:
+        skill_prompt += iterations_injection
+        console.print(f"[cyan]Injected {len(iterations_block_ids)} iteration(s) into prompt.[/cyan]")
 
     # Check for learnings file
     if LEARNINGS_PATH.exists():
@@ -432,7 +484,7 @@ def run_copywriter(
                 console.print(f"  [dim]No careers page found[/dim]")
 
         try:
-            messages = generate_outreach(contact, skill_prompt, client, variant=variant)
+            messages = generate_outreach(contact, skill_prompt, client, variant=variant, campaign_id=campaign_id)
             generated += 1
 
             # Preview
@@ -469,6 +521,14 @@ def run_copywriter(
                 if ok:
                     written += 1
                     console.print(f"  [green]Written to Notion[/green]")
+                    # Also create a Gmail draft for team review
+                    gmail_create_draft(
+                        to_email=contact.get("email", ""),
+                        subject=messages.cold_email_subject,
+                        body=messages.cold_email_body,
+                        contact_name=person,
+                        company_name=company,
+                    )
                 else:
                     errors += 1
             else:
@@ -492,6 +552,11 @@ def run_copywriter(
         summary.add_row("Campaign filter", campaign_id)
     summary.add_row("Campaign sender", campaign_sender)
     console.print(summary)
+
+    # Mark iterations as processed in Notion (only if messages were actually written)
+    if not dry_run and written > 0 and iterations_block_ids:
+        console.print("\n[cyan]Marking iterations as processed in Notion...[/cyan]")
+        mark_iterations_processed(iterations_block_ids)
 
 
 if __name__ == "__main__":
