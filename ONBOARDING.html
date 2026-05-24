@@ -153,16 +153,16 @@
 <hr />
 <h2>3. Setup From GitHub</h2>
 <h3>macOS / Linux</h3>
-<pre><code class="language-bash">git clone https://github.com/tumsocialai/strategic-partnerships.git
-cd strategic-partnerships
+<pre><code class="language-bash">git clone https://github.com/nicopaul19/tum-sales-agent.git
+cd tum-sales-agent
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.template .env
 </code></pre>
 <h3>Windows PowerShell</h3>
-<pre><code class="language-powershell">git clone https://github.com/tumsocialai/strategic-partnerships.git
-cd strategic-partnerships
+<pre><code class="language-powershell">git clone https://github.com/nicopaul19/tum-sales-agent.git
+cd tum-sales-agent
 py -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -309,23 +309,23 @@ python agent.py copywrite --campaign Workflow_0505 --sender &quot;Nicolas Paul&q
 <tbody>
 <tr>
 <td><code>com.tumsocialai.sales-collector</code></td>
-<td>Mon/Wed/Fri 09:00</td>
+<td>Mon/Wed/Fri 09:00 + 14:00</td>
 <td>Processes incoming screenshots, URLs, manual notes.</td>
 </tr>
 <tr>
-<td><code>com.tumsocialai.copywriter</code></td>
-<td>Monday 09:10</td>
-<td>Generates outreach copy + Gmail drafts, injects &amp; clears Notion iterations.</td>
-</tr>
-<tr>
 <td><code>com.tumsocialai.project-applications</code></td>
-<td>Scheduled</td>
+<td>Monday 09:30</td>
 <td>Processes project application intake.</td>
 </tr>
 <tr>
 <td><code>com.tumsocialai.requirements-enrichment</code></td>
-<td>Scheduled</td>
+<td>Monday 07:00 + 12:00</td>
 <td>Enriches requirements/applications.</td>
+</tr>
+<tr>
+<td><code>com.tumsocialai.notion-cleanup</code></td>
+<td>Monday 10:00 + 15:00</td>
+<td>Fills missing domains/account types automatically; duplicate merges remain manual.</td>
 </tr>
 </tbody>
 </table>
@@ -355,12 +355,12 @@ python agent.py copywrite --campaign Workflow_0505 --sender &quot;Nicolas Paul&q
 <td>Manual (<code>python agent.py feedback</code>)</td>
 </tr>
 <tr>
-<td><code>com.tumsocialai.notion-cleanup</code></td>
-<td>Manual (<code>python agent.py cleanup --all</code>)</td>
-</tr>
-<tr>
 <td><code>com.tumsocialai.enrichment</code></td>
 <td>Manual</td>
+</tr>
+<tr>
+<td><code>com.tumsocialai.copywriter</code></td>
+<td>Manual (<code>python agent.py copywrite --campaign ... --sender ...</code>)</td>
 </tr>
 </tbody>
 </table>
