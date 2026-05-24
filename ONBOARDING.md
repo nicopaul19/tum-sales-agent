@@ -70,8 +70,8 @@ You do **not** need coding knowledge. You need:
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/tumsocialai/strategic-partnerships.git
-cd strategic-partnerships
+git clone https://github.com/nicopaul19/tum-sales-agent.git
+cd tum-sales-agent
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -81,8 +81,8 @@ cp .env.template .env
 ### Windows PowerShell
 
 ```powershell
-git clone https://github.com/tumsocialai/strategic-partnerships.git
-cd strategic-partnerships
+git clone https://github.com/nicopaul19/tum-sales-agent.git
+cd tum-sales-agent
 py -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
@@ -174,10 +174,10 @@ Recommended calendar blocks:
 
 | Job | Schedule | Purpose |
 |---|---|---|
-| `com.tumsocialai.sales-collector` | Mon/Wed/Fri 09:00 | Processes incoming screenshots, URLs, manual notes. |
-| `com.tumsocialai.copywriter` | Monday 09:10 | Generates outreach copy + Gmail drafts, injects & clears Notion iterations. |
-| `com.tumsocialai.project-applications` | Scheduled | Processes project application intake. |
-| `com.tumsocialai.requirements-enrichment` | Scheduled | Enriches requirements/applications. |
+| `com.tumsocialai.sales-collector` | Mon/Wed/Fri 09:00 + 14:00 | Processes incoming screenshots, URLs, manual notes. |
+| `com.tumsocialai.project-applications` | Monday 09:30 | Processes project application intake. |
+| `com.tumsocialai.requirements-enrichment` | Monday 07:00 + 12:00 | Enriches requirements/applications. |
+| `com.tumsocialai.notion-cleanup` | Monday 10:00 + 15:00 | Fills missing domains/account types automatically; duplicate merges remain manual. |
 
 Campaign/action jobs that run on demand:
 
@@ -187,8 +187,8 @@ Campaign/action jobs that run on demand:
 | `com.tumsocialai.linkedin-manager` | Manual (`python agent.py linkedin ...`) |
 | `com.tumsocialai.sales-supervisor` | Manual (`python agent.py supervisor`) |
 | `com.tumsocialai.feedback-agent` | Manual (`python agent.py feedback`) |
-| `com.tumsocialai.notion-cleanup` | Manual (`python agent.py cleanup --all`) |
 | `com.tumsocialai.enrichment` | Manual |
+| `com.tumsocialai.copywriter` | Manual (`python agent.py copywrite --campaign ... --sender ...`) |
 
 On macOS, Quick Actions are optional convenience tools. They are not required for teammates using Codex, Claude Code, Antigravity, or Windows.
 
