@@ -43,7 +43,6 @@ from utils.notion_client import (
 )
 from utils.preflight import run_preflight
 from utils.gmail_client import create_draft as gmail_create_draft
-from utils.iterations_client import load_iterations, mark_iterations_processed
 
 console = Console()
 
@@ -398,12 +397,6 @@ def run_copywriter(
     if not skill_prompt:
         return
 
-    # Load & inject quality iterations from Notion
-    iterations_injection, iterations_block_ids = load_iterations()
-    if iterations_injection:
-        skill_prompt += iterations_injection
-        console.print(f"[cyan]Injected {len(iterations_block_ids)} iteration(s) into prompt.[/cyan]")
-
     # Check for learnings file
     if LEARNINGS_PATH.exists():
         console.print(f"[cyan]Learnings file found — will inject into prompts[/cyan]")
@@ -552,11 +545,6 @@ def run_copywriter(
         summary.add_row("Campaign filter", campaign_id)
     summary.add_row("Campaign sender", campaign_sender)
     console.print(summary)
-
-    # Mark iterations as processed in Notion (only if messages were actually written)
-    if not dry_run and written > 0 and iterations_block_ids:
-        console.print("\n[cyan]Marking iterations as processed in Notion...[/cyan]")
-        mark_iterations_processed(iterations_block_ids)
 
 
 if __name__ == "__main__":

@@ -1,9 +1,10 @@
 """
-Feedback Agent — Monthly outreach effectiveness analysis and A/B test evaluation.
+Feedback Agent — Weekly outreach effectiveness analysis and A/B test evaluation.
 
 Analyzes contacts with outreach messages, classifies outcomes as success/failure/skip,
-computes A/B variant statistics, runs GPT-4o pattern analysis, writes learnings to
-data/prompts/outreach_learnings.md, and sends an HTML summary email.
+computes A/B variant statistics, ingests manual copywriter iterations from Notion,
+runs GPT-4o pattern analysis, writes learnings to data/prompts/outreach_learnings.md,
+and sends an HTML summary email.
 
 Usage:
     python -m agents.feedback_agent                    # full run
@@ -38,6 +39,7 @@ from utils.config import (
 )
 from utils.api_logger import log_api_usage
 from utils.notion_client import _notion_api_headers
+from utils.iterations_client import load_iterations, mark_iterations_processed
 from agents.notion_cleanup import STATUS_HIERARCHY
 
 console = Console()
@@ -85,6 +87,9 @@ class FeedbackAnalysis(BaseModel):
     )
     ab_confidence: str = Field(
         description="Confidence in A/B result: 'high', 'medium', or 'low'"
+    )
+    iteration_learnings: List[str] = Field(
+        description="Reusable lessons distilled from manual Notion copywriter iterations, if any"
     )
 
 
@@ -309,8 +314,9 @@ def run_gpt_analysis(
     failures: List[dict],
     ab_stats: dict,
     client: OpenAI,
+    manual_iterations: str = "",
 ) -> Optional[FeedbackAnalysis]:
-    """Run GPT-4o pattern analysis on success/failure message pairs."""
+    """Run GPT-4o pattern analysis on outcomes, A/B stats, and manual iterations."""
 
     def _format_contact(c: dict) -> str:
         lines = [f"Contact: {c['contact_name']} @ {c['company_name']}"]
@@ -338,26 +344,33 @@ def run_gpt_analysis(
             f"{s['failure']} failure, {s['skip']} pending, success rate: {rate}"
         )
     ab_summary = "\n".join(ab_summary_lines)
+    manual_iterations_section = (
+        f"\n## MANUAL COPYWRITER ITERATIONS FROM NOTION\n{manual_iterations}\n"
+        if manual_iterations.strip()
+        else ""
+    )
 
     prompt = f"""You are analyzing outreach message effectiveness for TUM Social AI, a student AI-for-Good initiative at TUM.
 
 ## SUCCESSFUL OUTREACH (led to engagement, meetings, or partnerships)
-{success_text}
+{success_text or "(No resolved successes in this run.)"}
 
 ## FAILED OUTREACH (prospect unqualified or no response after 30+ days)
-{failure_text}
+{failure_text or "(No resolved failures in this run.)"}
 
 ## A/B TEST DATA
 Variant A framing: "We're developing AI solutions with partners like UN Women"
 Variant B framing: "We're multiplying the impact of our social partners like UN Women in over 50 countries through custom AI tools"
 
 {ab_summary}
+{manual_iterations_section}
 
 ## YOUR TASK
 1. Identify patterns that distinguish successful vs. failed outreach messages
 2. Provide actionable recommendations for improving future messages
 3. Analyze the A/B test results and determine which framing performs better
-4. Note any tone or style observations
+4. Distill manual Notion copywriter iterations into reusable prompt guidance
+5. Note any tone or style observations
 
 Be specific and actionable. Reference concrete examples from the messages above."""
 
@@ -377,7 +390,11 @@ Be specific and actionable. Reference concrete examples from the messages above.
         log_api_usage(
             "feedback_agent", "pattern_analysis", "gpt-4o",
             response.usage,
-            {"successes": len(successes), "failures": len(failures)}
+            {
+                "successes": len(successes),
+                "failures": len(failures),
+                "manual_iterations": bool(manual_iterations.strip()),
+            }
         )
 
         return result
@@ -391,7 +408,13 @@ Be specific and actionable. Reference concrete examples from the messages above.
 # Learnings file writer
 # =============================================================================
 
-def write_learnings_file(analysis: FeedbackAnalysis, ab_stats: dict, n_success: int, n_failure: int):
+def write_learnings_file(
+    analysis: FeedbackAnalysis,
+    ab_stats: dict,
+    n_success: int,
+    n_failure: int,
+    n_iterations: int = 0,
+):
     """Write analysis results to the learnings markdown file."""
     LEARNINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -410,6 +433,13 @@ def write_learnings_file(analysis: FeedbackAnalysis, ab_stats: dict, n_success: 
         rate = f"{s['success_rate']:.0%}" if s.get("success_rate") is not None else "N/A"
         lines.append(f"- Variant {v}: {s['success']}/{s['success'] + s['failure']} resolved → {rate} success rate")
     lines.append("")
+
+    if analysis.iteration_learnings:
+        lines.append("## MANUAL NOTION ITERATIONS")
+        lines.append(f"- Source: {n_iterations} unprocessed item(s) from the Notion Iterations page")
+        for item in analysis.iteration_learnings:
+            lines.append(f"- {item}")
+        lines.append("")
 
     # Winning Patterns
     lines.append("## WINNING PATTERNS")
@@ -448,6 +478,7 @@ def _generate_feedback_email_html(
     n_success: int,
     n_failure: int,
     n_skip: int,
+    n_iterations: int = 0,
 ) -> str:
     """Generate HTML email body for the feedback report."""
 
@@ -459,9 +490,16 @@ def _generate_feedback_email_html(
         s = ab_stats[v]
         rate = f"{s['success_rate']:.0%}" if s.get("success_rate") is not None else "N/A"
         ab_rows += f"<tr><td>Variant {v}</td><td>{s['total']}</td><td>{s['success']}</td><td>{s['failure']}</td><td>{rate}</td></tr>"
+    iteration_section = ""
+    if analysis.iteration_learnings:
+        iteration_section = f"""
+<h3>Manual Notion Iterations</h3>
+<p>{n_iterations} unprocessed iteration(s) from the Notion page were folded into the learnings file.</p>
+<ul>{_bullets(analysis.iteration_learnings)}</ul>
+"""
 
     return f"""<html><body style="font-family: -apple-system, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;">
-<h2>TUM Social AI — Monthly Outreach Feedback</h2>
+<h2>TUM Social AI — Weekly Outreach Feedback</h2>
 <p style="color: #666;">{datetime.now().strftime('%Y-%m-%d')} | {n_success} successes, {n_failure} failures, {n_skip} pending</p>
 
 <h3>A/B Test Results</h3>
@@ -481,6 +519,8 @@ def _generate_feedback_email_html(
 <h3>Recommendations</h3>
 <ul>{_bullets(analysis.recommendations)}</ul>
 
+{iteration_section}
+
 <h3>Tone & Style</h3>
 <p>{analysis.tone_observations}</p>
 
@@ -495,6 +535,7 @@ def send_feedback_email(
     n_success: int,
     n_failure: int,
     n_skip: int,
+    n_iterations: int = 0,
 ) -> bool:
     """Send feedback report email."""
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
@@ -509,14 +550,14 @@ def send_feedback_email(
     else:
         recipients = [GMAIL_ADDRESS]
 
-    subject = f"TUM Social AI — Monthly Outreach Feedback: {n_success} successes, {n_failure} failures (A/B winner: {analysis.ab_winner})"
+    subject = f"TUM Social AI — Weekly Outreach Feedback: {n_success} successes, {n_failure} failures (A/B winner: {analysis.ab_winner})"
 
     msg = MIMEMultipart()
     msg["From"] = GMAIL_ADDRESS
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
 
-    html_body = _generate_feedback_email_html(analysis, ab_stats, n_success, n_failure, n_skip)
+    html_body = _generate_feedback_email_html(analysis, ab_stats, n_success, n_failure, n_skip, n_iterations)
     msg.attach(MIMEText(html_body, "html"))
 
     try:
@@ -536,7 +577,7 @@ def send_feedback_email(
 
 def run_feedback(dry_run: bool = False, min_data: int = 10):
     """
-    Run the monthly feedback analysis.
+    Run the weekly feedback analysis.
 
     Args:
         dry_run: If True, analyze but don't write learnings or send email.
@@ -557,17 +598,28 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
         console.print("[red]Error: NOTION_TOKEN or NOTION_DB_CONTACTS_ID not configured[/red]")
         return
 
-    # Step 1: Fetch all contacts with outreach messages
+    # Step 1: Load manual copywriter iterations from Notion.
+    console.print("\n[cyan]Scanning Notion copywriter iterations page...[/cyan]")
+    iterations_injection, iterations_block_ids = load_iterations()
+    n_iterations = len(iterations_block_ids)
+    if n_iterations:
+        console.print(f"[cyan]Found {n_iterations} unprocessed copywriter iteration(s).[/cyan]")
+    else:
+        console.print("[dim]No unprocessed copywriter iterations found.[/dim]")
+
+    # Step 2: Fetch all contacts with outreach messages
     console.print("\n[cyan]Fetching contacts with outreach messages...[/cyan]")
     contacts = fetch_contacts_with_outreach(NOTION_DB_CONTACTS_ID)
 
     if not contacts:
-        console.print("[yellow]No contacts with outreach messages found. Nothing to analyze.[/yellow]")
-        return
+        console.print("[yellow]No contacts with outreach messages found.[/yellow]")
+        if not iterations_injection:
+            console.print("[yellow]No manual iterations found either. Nothing to analyze.[/yellow]")
+            return
 
     console.print(f"[cyan]Found {len(contacts)} contacts with outreach messages[/cyan]")
 
-    # Step 2: Classify outcomes
+    # Step 3: Classify outcomes
     successes = []
     failures = []
     skips = []
@@ -592,7 +644,7 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
     table.add_row("Total", str(len(contacts)))
     console.print(table)
 
-    # Step 3: Compute A/B stats
+    # Step 4: Compute A/B stats
     ab_stats = compute_ab_stats(contacts)
 
     ab_table = Table(title="A/B Test Distribution")
@@ -608,18 +660,23 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
         ab_table.add_row(label, str(s["total"]), str(s["success"]), str(s["failure"]), rate)
     console.print(ab_table)
 
-    # Step 4: Check minimum data threshold
+    # Step 5: Check minimum data threshold
     resolved = len(successes) + len(failures)
-    if resolved < min_data:
+    if resolved < min_data and not iterations_injection:
         console.print(f"\n[yellow]Only {resolved} resolved outcomes (need {min_data}). Skipping GPT-4o analysis.[/yellow]")
         console.print("[dim]Re-run with --min-data to lower the threshold.[/dim]")
         return
+    if resolved < min_data and iterations_injection:
+        console.print(
+            f"\n[yellow]Only {resolved} resolved outcomes (need {min_data}), "
+            "but manual Notion iterations are present, so feedback analysis will still run.[/yellow]"
+        )
 
-    # Step 5: Run GPT-4o analysis
+    # Step 6: Run GPT-4o analysis
     console.print(f"\n[cyan]Running GPT-4o pattern analysis ({len(successes)} successes, {len(failures)} failures)...[/cyan]")
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    analysis = run_gpt_analysis(successes, failures, ab_stats, client)
+    analysis = run_gpt_analysis(successes, failures, ab_stats, client, iterations_injection)
     if not analysis:
         console.print("[red]GPT-4o analysis failed. Aborting.[/red]")
         return
@@ -640,22 +697,31 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
     for r in analysis.recommendations:
         console.print(f"  > {r}")
 
+    if analysis.iteration_learnings:
+        console.print("\n[bold]Manual Notion Iterations:[/bold]")
+        for item in analysis.iteration_learnings:
+            console.print(f"  * {item}")
+
     console.print(f"\n[bold]Tone:[/bold] {analysis.tone_observations}")
 
-    # Step 6: Write learnings file
+    # Step 7: Write learnings file
     if not dry_run:
-        write_learnings_file(analysis, ab_stats, len(successes), len(failures))
+        write_learnings_file(analysis, ab_stats, len(successes), len(failures), n_iterations)
 
-        # Step 7: Send email report
-        send_feedback_email(analysis, ab_stats, len(successes), len(failures), len(skips))
+        if iterations_block_ids:
+            console.print("\n[cyan]Marking Notion iterations as processed...[/cyan]")
+            mark_iterations_processed(iterations_block_ids)
+
+        # Step 8: Send email report
+        send_feedback_email(analysis, ab_stats, len(successes), len(failures), len(skips), n_iterations)
     else:
-        console.print("\n[yellow]Dry run — skipped writing learnings and sending email[/yellow]")
+        console.print("\n[yellow]Dry run — skipped writing learnings, marking iterations processed, and sending email[/yellow]")
 
     console.print("\n[bold green]Feedback Agent finished.[/bold green]")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Monthly outreach feedback analysis and A/B test evaluation")
+    parser = argparse.ArgumentParser(description="Weekly outreach feedback analysis and A/B test evaluation")
     parser.add_argument("--dry-run", action="store_true", help="Analyze without writing learnings or sending email")
     parser.add_argument("--min-data", type=int, default=10, help="Minimum resolved outcomes to run analysis (default: 10)")
     args = parser.parse_args()
