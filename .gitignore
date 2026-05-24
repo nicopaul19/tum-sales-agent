@@ -4,6 +4,8 @@
 .env.*.local
 credentials.json
 token.json
+gmail_token.json
+client_secret_*.json
 
 # Business data — NEVER commit
 data/
