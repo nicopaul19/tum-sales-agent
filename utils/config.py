@@ -57,12 +57,27 @@ LINKEDIN_DUMP_DIR = INPUTS_DIR / "linkedin_dump"
 MASTER_CSV = TABLES_DIR / "master_input.csv"
 QUALIFIED_CSV = TABLES_DIR / "weekly_qualified_leads_with_contacts.csv"
 QUALIFIED_NO_CONTACT_CSV = TABLES_DIR / "weekly_qualified_leads_no_contact.csv"
+APOLLO_READY_CSV = TABLES_DIR / "top_leads_for_apollo_enrichment.csv"
+APOLLO_CONTACT_REVIEW_CSV = TABLES_DIR / "apollo_contact_review.csv"
+APOLLO_ENRICHMENT_BATCHES_JSON = TABLES_DIR / "apollo_enrichment_batches.json"
+APOLLO_ENRICHED_REVIEW_CSV = TABLES_DIR / "apollo_enriched_contacts_for_review.csv"
+APOLLO_UPLOAD_READY_CSV = TABLES_DIR / "apollo_upload_ready.csv"
 BACKLOG_CSV = TABLES_DIR / "backlog.csv"
 EXPORTED_ARCHIVE_CSV = TABLES_DIR / "exported_archive.csv"
 REQUALIFIED_BLOCKED_CSV = TABLES_DIR / "requalified_blocked_leads.csv"
 NO_PERSON_CSV = TABLES_DIR / "no_person_found_at_lead_account.csv"
 REPORTS_DIR = DATA_DIR / "reports"
 API_USAGE_LOG = LOGS_DIR / "api_usage.jsonl"
+
+# Known domain corrections for Apollo/Notion dedupe readiness.
+# Keep these small and evidence-backed; they fix recurring bad inferred domains.
+KNOWN_DOMAIN_CORRECTIONS = {
+    "crusoe.com": "crusoe.ai",
+    "grover.net": "grover.com",
+    "personio.ai": "personio.com",
+    "cluno.ai": "cluno.com",
+    "zeitai.com": "zeit-ai.com",
+}
 
 # CSV Headers
 MASTER_CSV_HEADERS = [
@@ -87,6 +102,7 @@ COMPANY_BLOCKLIST = [
     "tum-ai",
     "helsing",        # Defense/weapons company - doesn't align with our values
     "rheinmetall",    # Defense/weapons manufacturer
+    "zalando",        # Broad consumer/e-commerce corporate; weak fit for this outreach motion
     # Add more false positives here as discovered
 ]
 

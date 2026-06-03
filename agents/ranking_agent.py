@@ -14,6 +14,7 @@ Usage:
 """
 import smtplib
 import sys
+import re
 from datetime import datetime
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -36,6 +37,7 @@ from utils.config import (
     MASTER_CSV,
     QUALIFIED_CSV,
     QUALIFIED_NO_CONTACT_CSV,
+    APOLLO_READY_CSV,
     BACKLOG_CSV,
     EXPORTED_ARCHIVE_CSV,
     REQUALIFIED_BLOCKED_CSV,
@@ -45,7 +47,8 @@ from utils.config import (
     GMAIL_ADDRESS,
     GMAIL_APP_PASSWORD,
     REPORT_RECIPIENT_EMAIL,
-    RANKING_REPORT_RECIPIENTS
+    RANKING_REPORT_RECIPIENTS,
+    KNOWN_DOMAIN_CORRECTIONS
 )
 from utils.api_logger import log_api_usage
 from utils.notion_client import (
@@ -61,6 +64,8 @@ from utils.notion_client import (
 # Note: Notion upload happens after Apollo enrichment, not in ranking
 
 console = Console()
+
+TOP_LEADS_EXPORT_LIMIT = 30
 
 # ── Student Club Blocklist ──────────────────────────────────────────────────
 # Known student clubs, university associations, and student-run organizations.
@@ -106,6 +111,19 @@ STUDENT_CLUB_PATTERNS = [
     "universitätsverein",
     "fachschaft",            # Student council / department group
 ]
+
+
+def normalize_domain(domain: str) -> str:
+    """Normalize company domains before matching Notion/export records."""
+    domain = str(domain or "").lower().strip()
+    if not domain or domain == "nan":
+        return ""
+    match = re.search(r"(?:https?://)?(?:www\.)?([^/\s]+)", domain)
+    if not match:
+        normalized = domain.rstrip("/")
+    else:
+        normalized = match.group(1).rstrip("/")
+    return KNOWN_DOMAIN_CORRECTIONS.get(normalized, normalized)
 
 
 def is_student_club(company_name: str) -> bool:
@@ -395,7 +413,7 @@ def load_exported_archive() -> dict:
     archive = {}
     for _, row in df.iterrows():
         name = str(row.get("company_name", "")).lower().strip()
-        domain = str(row.get("company_domain", "")).lower().strip()
+        domain = normalize_domain(row.get("company_domain", ""))
         date_exported = str(row.get("date_exported", "")).strip()
 
         # Keep the most recent export date for each company
@@ -417,7 +435,7 @@ def append_to_exported_archive(top_df: pd.DataFrame):
     for _, row in top_df.iterrows():
         records.append({
             "company_name": str(row.get("company_name", "")).strip(),
-            "company_domain": str(row.get("company_domain", "")).strip(),
+            "company_domain": normalize_domain(row.get("company_domain", "")),
             "date_exported": today,
             "score": row.get("score", 0),
         })
@@ -425,6 +443,43 @@ def append_to_exported_archive(top_df: pd.DataFrame):
     write_header = not EXPORTED_ARCHIVE_CSV.exists()
     archive_df.to_csv(EXPORTED_ARCHIVE_CSV, mode="a", index=False, header=write_header)
     console.print(f"[green]Appended {len(records)} companies to export archive[/green]")
+
+
+def export_company_key(row) -> str:
+    """Stable identity for company-level export limits and dedupe."""
+    domain = normalize_domain(row.get("company_domain", ""))
+    if domain:
+        return f"domain:{domain}"
+
+    name = str(row.get("company_name", "") or "").lower().strip()
+    if name and name != "nan":
+        return f"name:{name}"
+
+    return ""
+
+
+def split_company_shortlist(df: pd.DataFrame, company_limit: int) -> tuple[pd.DataFrame, pd.DataFrame, int]:
+    """Select top unique companies while keeping extra contact rows for selected accounts."""
+    shortlisted_keys = set()
+    selected_rows = []
+    backlog_rows = []
+
+    for _, row in df.iterrows():
+        key = export_company_key(row)
+        if not key:
+            key = f"row:{len(selected_rows) + len(backlog_rows)}"
+
+        if key in shortlisted_keys:
+            selected_rows.append(row)
+        elif len(shortlisted_keys) < company_limit:
+            shortlisted_keys.add(key)
+            selected_rows.append(row)
+        else:
+            backlog_rows.append(row)
+
+    selected = pd.DataFrame(selected_rows) if selected_rows else pd.DataFrame()
+    backlog = pd.DataFrame(backlog_rows) if backlog_rows else pd.DataFrame()
+    return selected, backlog, len(shortlisted_keys)
 
 
 def load_pending_leads() -> pd.DataFrame:
@@ -555,7 +610,7 @@ def _generate_ranking_email_html(stats: dict) -> str:
         ("Qualified (score &ge; 5)", str(stats.get("qualified", 0)), "#28a745"),
         ("With contact person", str(stats.get("with_contact", 0)), "#28a745"),
         ("Without contact (need Apollo)", str(stats.get("without_contact", 0)), "#fd7e14"),
-        ("Blocked (engaged+ in Notion)", str(stats.get("blocked", 0)), "#6c757d"),
+        ("Blocked (existing in Notion)", str(stats.get("blocked", 0)), "#6c757d"),
         ("Re-qualified", str(stats.get("requalified", 0)), "#17a2b8"),
         ("Filtered out (score &lt; 5)", str(stats.get("filtered_out", 0)), "#6c757d"),
         ("Sent to backlog", str(stats.get("backlog", 0)), "#6c757d"),
@@ -812,16 +867,16 @@ def run_ranking(subject_override: str = ""):
     # Fetch existing contacts (names, LinkedIn URLs, emails) for person-level dedup
     existing_contacts = get_existing_contacts_from_notion()
 
-    # Split qualified leads into: blocked (engaged+), requalification candidates (low status), and new
-    blocked_leads = []    # Status >= Engaged → skip from CSV
-    requalify_candidates = []  # Status < Engaged, no active campaign → MAY re-enter pipeline (pending weekly shortlist)
+    # Split qualified leads into: existing Notion accounts vs net-new companies.
+    blocked_leads = []    # Any existing Notion Account → skip from CSV
+    requalify_candidates = []  # Kept for status/report compatibility; exports are strictly net-new.
     active_campaign_leads = []  # Active campaign < 1 month → skip
     new_leads = []        # Not in Notion at all
     trigger_updates = 0
 
     for idx, row in qualified.iterrows():
         company_name = str(row.get("company_name", "")).strip()
-        company_domain = str(row.get("company_domain", "")).strip()
+        company_domain = normalize_domain(str(row.get("company_domain", "")).strip())
         normalized_name = company_name.lower()
         new_trigger = str(row.get("trigger", "")).strip()
 
@@ -857,9 +912,8 @@ def run_ranking(subject_override: str = ""):
                     account_page_id=account_page_id
                 )
 
-            # Decide: block, skip (active campaign), or candidate for re-qualification
+            # Existing Notion Accounts are never exported into a new Apollo shortlist.
             if is_status_engaged_or_above(account_status):
-                # Status >= Engaged → always BLOCK
                 blocked_leads.append({
                     "company": company_name,
                     "score": row.get("score", 0),
@@ -868,7 +922,6 @@ def run_ranking(subject_override: str = ""):
                 if account_status:
                     reset_account_status_if_stale(account_page_id, account_status, company_name)
             elif _has_active_campaign(campaign_ids):
-                # Active Workflow campaign < 1 month old → don't re-qualify yet
                 active_campaign_leads.append({
                     "company": company_name,
                     "score": row.get("score", 0),
@@ -876,15 +929,17 @@ def run_ranking(subject_override: str = ""):
                 })
                 console.print(f"[yellow]Skipping: {company_name} — campaign within {CAMPAIGN_COOLDOWN_DAYS}d cooldown ({', '.join(campaign_ids)})[/yellow]")
             else:
-                # Low-engagement status + no active campaign → candidate for re-qualification
-                # (actual re-qualification only if shortlisted into weekly top CSVs)
-                requalify_candidates.append(row)
-                console.print(f"[dim]Re-qualify candidate: {company_name} (status: {account_status or 'none'})[/dim]")
+                blocked_leads.append({
+                    "company": company_name,
+                    "score": row.get("score", 0),
+                    "reason": f"{match_reason} (status: {account_status or 'none'})"
+                })
+                console.print(f"[dim]Skipping existing Notion account: {company_name} (status: {account_status or 'none'})[/dim]")
         else:
             new_leads.append(row)
 
     if blocked_leads:
-        console.print(f"[yellow]Blocked {len(blocked_leads)} engaged+ companies from CSV:[/yellow]")
+        console.print(f"[yellow]Blocked {len(blocked_leads)} existing Notion companies from CSV:[/yellow]")
         for dup in blocked_leads[:5]:
             console.print(f"  - {dup['company']} (score {dup['score']:.1f}): {dup['reason']}")
         if len(blocked_leads) > 5:
@@ -898,9 +953,9 @@ def run_ranking(subject_override: str = ""):
     if trigger_updates > 0:
         console.print(f"[green]Updated triggers for {trigger_updates} existing companies in Notion[/green]")
 
-    # Convert new_leads + requalify_candidates back to dataframe
-    # (candidates compete for weekly slots; only those shortlisted get "requalified" status)
-    all_qualifying = new_leads + requalify_candidates
+    # Only net-new companies can enter the Apollo export. Since this happens before
+    # capping, removed Notion duplicates are automatically backfilled by next-best rows.
+    all_qualifying = new_leads
     requalify_candidate_names = set(
         str(r.get("company_name", "")).strip() for r in requalify_candidates
     )
@@ -926,7 +981,7 @@ def run_ranking(subject_override: str = ""):
             today = datetime.now()
             for idx, row in qualified_new.iterrows():
                 name = str(row.get("company_name", "")).lower().strip()
-                domain = str(row.get("company_domain", "")).lower().strip()
+                domain = normalize_domain(row.get("company_domain", ""))
 
                 # Find the most recent export date for this company
                 export_date_str = None
@@ -973,12 +1028,17 @@ def run_ranking(subject_override: str = ""):
             weekly_qualified = pd.DataFrame()
             backlog = pd.DataFrame()
         else:
-            # Cap at 25 qualified leads per week; rest goes to backlog
-            MAX_QUALIFIED = 25
-            weekly_qualified = qualified_new.head(MAX_QUALIFIED)
-            backlog = qualified_new.iloc[MAX_QUALIFIED:]
+            # Cap at the campaign export limit by unique company. If one selected
+            # company already has multiple contacts, keep those contact rows together.
+            weekly_qualified, backlog, shortlisted_company_count = split_company_shortlist(
+                qualified_new,
+                TOP_LEADS_EXPORT_LIMIT,
+            )
 
-            console.print(f"[green]Qualified leads for Apollo: {len(weekly_qualified)} (capped at {MAX_QUALIFIED})[/green]")
+            console.print(
+                f"[green]Qualified companies for Apollo: {shortlisted_company_count} "
+                f"(capped at {TOP_LEADS_EXPORT_LIMIT}); rows: {len(weekly_qualified)}[/green]"
+            )
             console.print(f"[green]Score range: {weekly_qualified['score'].min():.1f} - {weekly_qualified['score'].max():.1f}[/green]")
             if not backlog.empty:
                 console.print(f"[yellow]Overflow to backlog: {len(backlog)} leads (qualified but beyond cap)[/yellow]")
@@ -1013,7 +1073,7 @@ def run_ranking(subject_override: str = ""):
             "person_name": "",
             "score": bl["score"],
             "notion_status": bl["reason"],
-            "action": "blocked (engaged+)",
+            "action": "blocked (existing in Notion)",
         })
     for ac in active_campaign_leads:
         rq_bl_records.append({
@@ -1034,8 +1094,12 @@ def run_ranking(subject_override: str = ""):
                       "linkedin_url_contact", "linkedin_url_post", "trigger", "score",
                       "reasoning", "source"]
 
+    if not weekly_qualified.empty and "company_domain" in weekly_qualified.columns:
+        weekly_qualified = weekly_qualified.copy()
+        weekly_qualified["company_domain"] = weekly_qualified["company_domain"].apply(normalize_domain)
+
+    # Always split and write both export files, plus the joint Apollo-ready file.
     if not weekly_qualified.empty:
-        # Split: leads with contact (person_name present) vs company-only
         has_contact_mask = (
             weekly_qualified["person_name"].notna() &
             (weekly_qualified["person_name"].astype(str).str.strip() != "") &
@@ -1043,67 +1107,69 @@ def run_ranking(subject_override: str = ""):
         )
         with_contact = weekly_qualified[has_contact_mask]
         without_contact = weekly_qualified[~has_contact_mask]
-
-        # Display leads with contact
-        if not with_contact.empty:
-            table = Table(title=f"Top Leads — With Contact ({len(with_contact)})")
-            table.add_column("#", style="dim")
-            table.add_column("Company", style="cyan")
-            table.add_column("Contact", style="white")
-            table.add_column("Score", style="green")
-            table.add_column("Reasoning", style="dim", max_width=40)
-
-            for i, (_, row) in enumerate(with_contact.iterrows(), 1):
-                table.add_row(
-                    str(i),
-                    str(row.get("company_name", ""))[:25],
-                    str(row.get("person_name", ""))[:20],
-                    f"{row['score']:.1f}",
-                    str(row.get("reasoning", ""))[:40]
-                )
-            console.print(table)
-
-        # Display company-only leads
-        if not without_contact.empty:
-            table2 = Table(title=f"No Contact Found ({len(without_contact)} — Manual Lookup Needed)")
-            table2.add_column("#", style="dim")
-            table2.add_column("Company", style="cyan")
-            table2.add_column("Domain", style="white")
-            table2.add_column("Score", style="green")
-
-            for i, (_, row) in enumerate(without_contact.iterrows(), 1):
-                table2.add_row(
-                    str(i),
-                    str(row.get("company_name", ""))[:25],
-                    str(row.get("company_domain", ""))[:25],
-                    f"{row['score']:.1f}"
-                )
-            console.print(table2)
-
-        # Save leads WITH contact → weekly_qualified_leads.csv (for Apollo)
-        if not with_contact.empty:
-            available = [c for c in export_columns if c in with_contact.columns]
-            with_contact[available].to_csv(QUALIFIED_CSV, index=False)
-            console.print(f"[green]Saved {len(with_contact)} leads with contact to {QUALIFIED_CSV.name}[/green]")
-        else:
-            # Write empty CSV with headers so upload agent can still read it
-            pd.DataFrame(columns=export_columns).to_csv(QUALIFIED_CSV, index=False)
-            console.print("[yellow]No leads with contact info this week[/yellow]")
-
-        # Save leads WITHOUT contact → weekly_qualified_leads_no_contact.csv (for Apollo to try)
-        if not without_contact.empty:
-            available = [c for c in export_columns if c in without_contact.columns]
-            without_contact[available].to_csv(QUALIFIED_NO_CONTACT_CSV, index=False)
-            console.print(f"[yellow]Saved {len(without_contact)} leads without contact to {QUALIFIED_NO_CONTACT_CSV.name}[/yellow]")
-        else:
-            pd.DataFrame(columns=export_columns).to_csv(QUALIFIED_NO_CONTACT_CSV, index=False)
-
-        # Archive ALL exported companies (both with and without contact)
-        append_to_exported_archive(weekly_qualified)
-
-        console.print(f"\n[dim]Summary: {len(with_contact)} with contact (Apollo) + {len(without_contact)} no contact (Apollo attempt)[/dim]")
     else:
+        with_contact = pd.DataFrame(columns=export_columns)
+        without_contact = pd.DataFrame(columns=export_columns)
         console.print("[yellow]No new leads to export[/yellow]")
+
+    # Display leads with contact
+    if not with_contact.empty:
+        table = Table(title=f"Top Leads — With Contact ({len(with_contact)})")
+        table.add_column("#", style="dim")
+        table.add_column("Company", style="cyan")
+        table.add_column("Contact", style="white")
+        table.add_column("Score", style="green")
+        table.add_column("Reasoning", style="dim", max_width=40)
+
+        for i, (_, row) in enumerate(with_contact.iterrows(), 1):
+            table.add_row(
+                str(i),
+                str(row.get("company_name", ""))[:25],
+                str(row.get("person_name", ""))[:20],
+                f"{row['score']:.1f}",
+                str(row.get("reasoning", ""))[:40]
+            )
+        console.print(table)
+
+    # Display company-only leads
+    if not without_contact.empty:
+        table2 = Table(title=f"No Contact Found ({len(without_contact)} — Manual Lookup Needed)")
+        table2.add_column("#", style="dim")
+        table2.add_column("Company", style="cyan")
+        table2.add_column("Domain", style="white")
+        table2.add_column("Score", style="green")
+
+        for i, (_, row) in enumerate(without_contact.iterrows(), 1):
+            table2.add_row(
+                str(i),
+                str(row.get("company_name", ""))[:25],
+                str(row.get("company_domain", ""))[:25],
+                f"{row['score']:.1f}"
+            )
+        console.print(table2)
+
+    available_with = [c for c in export_columns if c in with_contact.columns]
+    with_contact[available_with].to_csv(QUALIFIED_CSV, index=False)
+    console.print(f"[green]Saved {len(with_contact)} leads with contact to {QUALIFIED_CSV.name}[/green]")
+
+    available_without = [c for c in export_columns if c in without_contact.columns]
+    without_contact[available_without].to_csv(QUALIFIED_NO_CONTACT_CSV, index=False)
+    console.print(f"[yellow]Saved {len(without_contact)} leads without contact to {QUALIFIED_NO_CONTACT_CSV.name}[/yellow]")
+
+    if not weekly_qualified.empty:
+        joint_export = weekly_qualified.copy()
+        joint_export["contact_lookup_status"] = has_contact_mask.map({
+            True: "has_contact",
+            False: "needs_contact_search",
+        }).values
+        available_joint = [c for c in export_columns if c in joint_export.columns] + ["contact_lookup_status"]
+        joint_export[available_joint].to_csv(APOLLO_READY_CSV, index=False)
+        append_to_exported_archive(weekly_qualified)
+    else:
+        pd.DataFrame(columns=export_columns + ["contact_lookup_status"]).to_csv(APOLLO_READY_CSV, index=False)
+    console.print(f"[green]Saved {len(weekly_qualified)} total leads to {APOLLO_READY_CSV.name}[/green]")
+
+    console.print(f"\n[dim]Summary: {len(with_contact)} with contact (Apollo) + {len(without_contact)} no contact (Apollo attempt)[/dim]")
 
     # Note: Notion upload happens AFTER Apollo enrichment (not here)
     console.print("\n[dim]Notion upload skipped - will happen after Apollo enrichment[/dim]")
@@ -1173,7 +1239,7 @@ def run_ranking(subject_override: str = ""):
         "status"
     ] = "filtered_out"
 
-    # Mark blocked (engaged+) companies as duplicate in Notion
+    # Mark existing Notion companies as duplicates.
     master_df.loc[
         (master_df["company_name"].isin(blocked_companies)) & eligible_mask,
         "status"
@@ -1202,7 +1268,7 @@ def run_ranking(subject_override: str = ""):
     summary_table.add_row("Leads scored", str(len(pending)))
     summary_table.add_row("Qualified (score >= 5)", str(len(qualified)))
     summary_table.add_row("Filtered out (score < 5)", str(len(filtered_out)))
-    summary_table.add_row("Blocked (engaged+)", str(len(blocked_leads)))
+    summary_table.add_row("Blocked (existing in Notion)", str(len(blocked_leads)))
     summary_table.add_row("Skipped (active campaign)", str(len(active_campaign_leads)))
     summary_table.add_row("Re-qualified", str(len(requalified_leads)))
     summary_table.add_row("Campaign shortlist", str(len(weekly_qualified)))
@@ -1242,6 +1308,8 @@ def run_ranking(subject_override: str = ""):
         "sources": source_dist,
     }
     extra_csvs = []
+    if APOLLO_READY_CSV.exists() and APOLLO_READY_CSV.stat().st_size > 0:
+        extra_csvs.append(APOLLO_READY_CSV)
     if REQUALIFIED_BLOCKED_CSV.exists() and REQUALIFIED_BLOCKED_CSV.stat().st_size > 0:
         extra_csvs.append(REQUALIFIED_BLOCKED_CSV)
 
@@ -1251,6 +1319,7 @@ def run_ranking(subject_override: str = ""):
     console.print(f"\n[bold green]Next step: Send both CSVs to Apollo, then run upload agent[/bold green]")
     console.print(f"[dim]With contact    → {QUALIFIED_CSV.name}[/dim]")
     console.print(f"[dim]Without contact → {QUALIFIED_NO_CONTACT_CSV.name}[/dim]")
+    console.print(f"[dim]Joint Apollo-ready → {APOLLO_READY_CSV.name}[/dim]")
 
 
 if __name__ == "__main__":

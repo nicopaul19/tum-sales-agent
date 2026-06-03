@@ -48,6 +48,14 @@ def main() -> int:
     upload.add_argument("--dry-run", action="store_true", help="Preview without writing to Notion")
     upload.add_argument("--no-input", action="store_true", help="Fail instead of prompting")
 
+    apollo_enrich = sub.add_parser("apollo-enrich", help="Prepare Apollo batches and review/upload CSVs")
+    apollo_enrich.add_argument("--review-csv", default="", help="Contact review CSV from Apollo people search")
+    apollo_enrich.add_argument("--lead-csv", default="", help="Joint top leads CSV from ranking")
+    apollo_enrich.add_argument("--apollo-csv", default="", help="Apollo UI export CSV to normalize")
+    apollo_enrich.add_argument("--mcp-json", default="", help="Captured Apollo MCP enrichment JSON/JSONL")
+    apollo_enrich.add_argument("--batch-size", type=int, default=10, help="People enrichment batch size")
+    apollo_enrich.add_argument("--dry-run", action="store_true", help="Preview without writing files")
+
     copywrite = sub.add_parser("copywrite", help="Generate campaign outreach copy")
     copywrite.add_argument("--campaign", default="", help="Campaign ID, e.g. Workflow_0505")
     copywrite.add_argument("--sender", default="", help="Campaign sender full name")
@@ -97,6 +105,21 @@ def main() -> int:
         if args.no_input:
             module_args.append("--no-input")
         return run_module("agents.upload_agent", module_args)
+    if args.command == "apollo-enrich":
+        module_args = []
+        if args.review_csv:
+            module_args += ["--review-csv", args.review_csv]
+        if args.lead_csv:
+            module_args += ["--lead-csv", args.lead_csv]
+        if args.apollo_csv:
+            module_args += ["--apollo-csv", args.apollo_csv]
+        if args.mcp_json:
+            module_args += ["--mcp-json", args.mcp_json]
+        if args.batch_size:
+            module_args += ["--batch-size", str(args.batch_size)]
+        if args.dry_run:
+            module_args.append("--dry-run")
+        return run_module("agents.apollo_enrichment_agent", module_args)
     if args.command == "copywrite":
         module_args = []
         if args.campaign:

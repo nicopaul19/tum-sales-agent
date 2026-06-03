@@ -33,11 +33,15 @@ from utils.config import (
     DEFAULT_CAMPAIGN_SENDER,
     QUALIFIED_CSV,
     QUALIFIED_NO_CONTACT_CSV,
+    APOLLO_CONTACT_REVIEW_CSV,
+    APOLLO_ENRICHED_REVIEW_CSV,
     NO_PERSON_CSV,
-    TABLES_DIR
+    TABLES_DIR,
+    KNOWN_DOMAIN_CORRECTIONS
 )
 from utils.notion_client import (
     clean_value,
+    contact_phone_safe,
     get_existing_accounts_from_notion,
     get_existing_contacts_from_notion,
     is_status_engaged_or_above,
@@ -74,7 +78,8 @@ def normalize_domain(domain: str) -> str:
         domain = domain[8:]
     if domain.startswith("www."):
         domain = domain[4:]
-    return domain.rstrip("/")
+    domain = domain.rstrip("/")
+    return KNOWN_DOMAIN_CORRECTIONS.get(domain, domain)
 
 
 def find_missing_companies(no_contact_df: pd.DataFrame, apollo_df: pd.DataFrame) -> pd.DataFrame:
@@ -120,11 +125,92 @@ def find_missing_companies(no_contact_df: pd.DataFrame, apollo_df: pd.DataFrame)
     return pd.DataFrame(missing) if missing else pd.DataFrame()
 
 
-def save_no_person_found(missing_df: pd.DataFrame):
+def build_contact_evidence_df(apollo_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build the evidence set for "Apollo found someone" checks.
+
+    The strict upload CSV may omit contacts that still need a senior mobile
+    number, so use the full enriched review file when available. That prevents
+    companies with found-but-blocked contacts from being misclassified as
+    no-person-found.
+    """
+    frames = [apollo_df]
+    if APOLLO_ENRICHED_REVIEW_CSV.exists():
+        try:
+            review_df = pd.read_csv(APOLLO_ENRICHED_REVIEW_CSV)
+            if not review_df.empty:
+                if "upload_blocker" in review_df.columns:
+                    review_df = review_df[
+                        review_df["upload_blocker"].fillna("").astype(str).str.strip() != "no_person_found"
+                    ]
+                frames.append(review_df)
+                console.print(f"[dim]Using {APOLLO_ENRICHED_REVIEW_CSV.name} as contact evidence for missing-company checks[/dim]")
+        except Exception as e:
+            console.print(f"[yellow]Could not read {APOLLO_ENRICHED_REVIEW_CSV.name}: {e}[/yellow]")
+    if APOLLO_CONTACT_REVIEW_CSV.exists():
+        try:
+            review_df = pd.read_csv(APOLLO_CONTACT_REVIEW_CSV)
+            if not review_df.empty and "review_status" in review_df.columns:
+                handled = review_df[
+                    review_df["review_status"].astype(str).str.strip().isin(
+                        ["selected_for_review", "known_contact", "review_flag"]
+                    )
+                ]
+                if not handled.empty:
+                    frames.append(handled)
+                    console.print(f"[dim]Using handled rows from {APOLLO_CONTACT_REVIEW_CSV.name} for missing-company checks[/dim]")
+        except Exception as e:
+            console.print(f"[yellow]Could not read {APOLLO_CONTACT_REVIEW_CSV.name}: {e}[/yellow]")
+    return pd.concat(frames, ignore_index=True, sort=False)
+
+
+def _row_exists_in_notion_accounts(row: pd.Series, notion_accounts: Optional[dict]) -> bool:
+    """Return True if a CSV row already has a matching Notion Account."""
+    if not notion_accounts:
+        return False
+    domain = normalize_domain(str(row.get("company_domain", "") or row.get("Website", "") or ""))
+    name = str(row.get("company_name", "") or row.get("Company Name", "") or "").lower().strip()
+    return bool(
+        (domain and domain in notion_accounts.get("domains", {})) or
+        (name and name in notion_accounts.get("company_names", {}))
+    )
+
+
+def dedupe_rows_against_notion_accounts(df: pd.DataFrame, notion_accounts: Optional[dict]) -> tuple[pd.DataFrame, int]:
+    """Remove rows whose company already exists in Notion Accounts."""
+    if df.empty or not notion_accounts:
+        return df, 0
+    keep_rows = []
+    removed = 0
+    for _, row in df.iterrows():
+        if _row_exists_in_notion_accounts(row, notion_accounts):
+            removed += 1
+            continue
+        keep_rows.append(row)
+    return (pd.DataFrame(keep_rows) if keep_rows else pd.DataFrame(columns=df.columns), removed)
+
+
+def prune_no_person_found_against_notion(notion_accounts: Optional[dict], dry_run: bool = False):
+    """Prune the persisted no-person list against current Notion Accounts."""
+    if not NO_PERSON_CSV.exists():
+        return
+    existing = pd.read_csv(NO_PERSON_CSV)
+    filtered, removed = dedupe_rows_against_notion_accounts(existing, notion_accounts)
+    if removed == 0:
+        console.print(f"[dim]{NO_PERSON_CSV.name} already has no current Notion Account duplicates[/dim]")
+        return
+    if dry_run:
+        console.print(f"[yellow]Dry run — would remove {removed} Notion duplicates from {NO_PERSON_CSV.name}[/yellow]")
+        return
+    filtered.to_csv(NO_PERSON_CSV, index=False)
+    console.print(f"[yellow]Removed {removed} Notion duplicates from {NO_PERSON_CSV.name}[/yellow]")
+
+
+def save_no_person_found(missing_df: pd.DataFrame, notion_accounts: Optional[dict] = None):
     """
     Append missing companies to the no_person_found CSV.
 
-    Deduplicates by company_domain/company_name against existing entries.
+    Deduplicates by company_domain/company_name against existing entries and Notion Accounts.
     """
     today = datetime.now().strftime("%Y-%m-%d")
     export_columns = ["date_added", "company_name", "company_domain",
@@ -133,6 +219,12 @@ def save_no_person_found(missing_df: pd.DataFrame):
     # Prepare new rows
     new_rows = missing_df[[c for c in export_columns if c in missing_df.columns]].copy()
     new_rows["date_flagged"] = today
+    new_rows, removed_notion = dedupe_rows_against_notion_accounts(new_rows, notion_accounts)
+    if removed_notion:
+        console.print(f"[yellow]Skipped {removed_notion} missing companies already present in Notion Accounts[/yellow]")
+    if new_rows.empty:
+        console.print(f"[dim]No missing companies left to add to {NO_PERSON_CSV.name} after Notion dedupe[/dim]")
+        return
 
     # Load existing and deduplicate
     if NO_PERSON_CSV.exists():
@@ -179,13 +271,16 @@ def parse_apollo_row(row: pd.Series) -> dict:
     last = clean_value(row.get("Last Name"))
     person_name = f"{first} {last}".strip()
 
-    # Pick the best phone: Corporate Phone > Work Direct > Mobile > Home
+    company_phone = clean_value(row.get("Company Phone"))
+
+    # Pick the best personal phone only. Corporate phone must not become contact mobile.
     phone = ""
-    for col in ["Corporate Phone", "Work Direct Phone", "Mobile Phone", "Home Phone"]:
+    for col in ["Work Direct Phone", "Mobile Phone", "Home Phone"]:
         v = clean_value(row.get(col))
         if v:
-            phone = v
+            phone = v.strip().lstrip("'")
             break
+    phone = contact_phone_safe(phone, company_phone)
 
     # Parse funding amount
     funding_amount = row.get("Latest Funding Amount")
@@ -210,7 +305,7 @@ def parse_apollo_row(row: pd.Series) -> dict:
         "company_linkedin": clean_value(row.get("Company Linkedin Url")),
         "city": clean_value(row.get("City")),
         "country": clean_value(row.get("Company Country")),
-        "company_phone": clean_value(row.get("Company Phone")),
+        "company_phone": company_phone,
         "industry": clean_value(row.get("Industry")),
         "trigger": clean_value(row.get("Trigger")),
         "mission": clean_value(row.get("Mission (reasoning)")),
@@ -331,7 +426,8 @@ def run_upload(csv_path: str, sender: str = "", dry_run: bool = False, interacti
         console.print(f"[cyan]Found {no_contact_count} companies in no-contact qualified leads[/cyan]")
 
         if no_contact_count > 0:
-            missing = find_missing_companies(no_contact_df, apollo_df)
+            contact_evidence_df = build_contact_evidence_df(apollo_df)
+            missing = find_missing_companies(no_contact_df, contact_evidence_df)
             found_count = no_contact_count - len(missing)
 
             if not missing.empty:
@@ -340,10 +436,7 @@ def run_upload(csv_path: str, sender: str = "", dry_run: bool = False, interacti
                     console.print(f"  - {row.get('company_name', '?')} ({row.get('company_domain', '?')})")
                 if len(missing) > 10:
                     console.print(f"  ... and {len(missing) - 10} more")
-                if dry_run:
-                    console.print(f"[yellow]Dry run — would append {len(missing)} companies to {NO_PERSON_CSV.name}[/yellow]")
-                else:
-                    save_no_person_found(missing)
+                console.print(f"[yellow]Will append after live Notion Account dedupe: {NO_PERSON_CSV.name}[/yellow]")
             else:
                 console.print(f"[green]Apollo found contacts for all {no_contact_count} no-contact companies[/green]")
 
@@ -392,6 +485,16 @@ def run_upload(csv_path: str, sender: str = "", dry_run: bool = False, interacti
     contacts_lookup = get_existing_contacts_from_notion(NOTION_DB_CONTACTS_ID) if contacts_available else {
         "emails": set(), "linkedin_urls": set(), "names": set()
     }
+    prune_no_person_found_against_notion(accounts_lookup, dry_run=dry_run)
+    if not missing.empty:
+        if dry_run:
+            filtered_missing, removed_notion = dedupe_rows_against_notion_accounts(missing, accounts_lookup)
+            console.print(
+                f"[yellow]Dry run — would append {len(filtered_missing)} companies to {NO_PERSON_CSV.name} "
+                f"after skipping {removed_notion} Notion duplicates[/yellow]"
+            )
+        else:
+            save_no_person_found(missing, notion_accounts=accounts_lookup)
 
     # --- Step 4: Parse and group Apollo rows by company ---
     console.print("\n[cyan]Step 4: Parsing Apollo rows...[/cyan]")
@@ -496,6 +599,7 @@ def run_upload(csv_path: str, sender: str = "", dry_run: bool = False, interacti
                 account_page_id=page_id,
                 job_title=contact_data.get("job_title", ""),
                 phone=contact_data.get("phone", ""),
+                company_phone=account_data.get("company_phone", ""),
                 apollo_contact_id=contact_data.get("apollo_contact_id", ""),
                 campaign_sender=campaign_sender,
                 database_id=NOTION_DB_CONTACTS_ID,
