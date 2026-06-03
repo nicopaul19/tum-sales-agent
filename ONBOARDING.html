@@ -198,7 +198,7 @@
 
 <h1>TUM Social AI — Strategic Partnerships Agents</h1>
 <h2 style="margin-top:0.3em; color:#444; font-weight:400; font-size:1.1em;">On-Demand Campaign Onboarding Guide</h2>
-<p><strong>Last updated:</strong> May 24, 2026 &nbsp;|&nbsp; <strong>Audience:</strong> TUM Social AI teammates running partnership campaigns from Codex, Claude Code, Antigravity, or a terminal.</p>
+<p><strong>Last updated:</strong> June 3, 2026 &nbsp;|&nbsp; <strong>Audience:</strong> TUM Social AI teammates running partnership campaigns from Codex, Claude Code, Antigravity, or a terminal.</p>
 
 <hr>
 
@@ -383,6 +383,12 @@
         <span class="node-badge badge-weekly">Mon 10:00 + 15:00</span>
       </div>
 
+      <div class="node node-weekly">
+        <div class="node-title">☎️ phone-enrich</div>
+        <div class="node-sub">Finds missing company phone numbers from official websites, Impressum, Kontakt, and contact pages.</div>
+        <span class="node-badge badge-manual">manual · <code>agent.py phone-enrich</code></span>
+      </div>
+
     </div>
   </div>
 
@@ -395,12 +401,26 @@
 <ol>
   <li><strong>Collect input</strong> from LinkedIn screenshots, LinkedIn URLs, and manual contact notes.</li>
   <li><strong>Create a top leads report on demand</strong> when the team wants a new campaign shortlist.</li>
-  <li><strong>Run Apollo enrichment review</strong> with <code>python agent.py apollo-enrich</code>.</li>
+  <li><strong>Deduplicate against Notion before export</strong>, split the shortlist into companies with known contacts and companies without contacts, and backfill with the next best companies when existing Accounts are removed.</li>
+  <li><strong>Run Apollo search and enrichment</strong>, then normalize results with <code>python agent.py apollo-enrich</code>.</li>
   <li><strong>Upload the strict Apollo-ready CSV into Notion</strong> with an explicit campaign sender.</li>
   <li><strong>Generate outreach copy</strong> for that sender — and automatically create Gmail drafts in <code>partnerships@tum-socialaiclub.de</code>.</li>
   <li><strong>Review LinkedIn connection/follow-up actions</strong> when requested.</li>
 </ol>
 <p>The system is intentionally no longer a fixed weekly campaign machine. Campaign actions should happen when someone deliberately asks for them.</p>
+
+<h3>Current End-to-End Corporate Workflow</h3>
+<ol>
+  <li>Save LinkedIn screenshots, LinkedIn post URLs, or manual lead notes into <code>data/inputs/</code>, then run <code>python agent.py collect</code>.</li>
+  <li>Run <code>python agent.py rank</code>. The ranker checks Notion Accounts before exporting, deduplicates by domain, excludes blocked weak-fit companies such as Zalando, and backfills the shortlist from the next-ranked companies.</li>
+  <li>The ranker always writes three export files: <code>weekly_qualified_leads_with_contacts.csv</code>, <code>weekly_qualified_leads_no_contact.csv</code>, and <code>top_leads_for_apollo_enrichment.csv</code>.</li>
+  <li>Run Apollo people search for companies in the no-contact file. Companies that still have no suitable person are recorded in <code>no_person_found_at_lead_account.csv</code> and deduplicated against current Notion Accounts before reuse.</li>
+  <li>For contacts in marketing, recruiting, people, talent, or similarly senior go-to-market/hiring roles, Apollo needs email plus a real mobile number. For other useful contacts, email is enough.</li>
+  <li>Run <code>python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"</code> or <code>python agent.py apollo-enrich --apollo-csv "apollo_export.csv"</code>. This creates the review CSV and the strict upload CSV.</li>
+  <li>Review <code>apollo_enriched_contacts_for_review.csv</code>. Rows blocked with <code>needs_mobile_scrape</code>, <code>missing_enriched_email</code>, <code>no_person_found</code>, or review flags do not go to Notion yet.</li>
+  <li>Upload <code>apollo_upload_ready.csv</code> with <code>python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"</code>. Upload always sets Account Type* to <code>Corporate</code>, Contact Status to <code>New</code>, and rejects any contact mobile number that equals the company phone number.</li>
+  <li>Run <code>python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code>. The copywriter writes Notion outreach fields and creates Gmail drafts for review.</li>
+</ol>
 
 <h3>What Each Agent Is Built On</h3>
 <table>
@@ -414,6 +434,16 @@
 <tr><td><code>copywriter_agent</code></td><td>Generates campaign-specific outreach in Notion <strong>and creates Gmail drafts</strong>.</td><td>Uses the shared outreach skill prompt plus processed <code>data/prompts/outreach_learnings.md</code>, reads unprocessed iterations from the Notion Iterations page and injects them into the prompt, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address. After a successful run it marks the iterations as Processed ✅. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts.</td></tr>
 <tr><td><code>linkedin_manager</code></td><td>Reviews LinkedIn connection/follow-up actions.</td><td>Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3–5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard.</td></tr>
 <tr><td><code>feedback_agent</code></td><td>Turns outcome data and manual copywriter iterations into prompt learnings.</td><td>Reads resolved outcomes, analyzes A/B test results, scans the Notion Iterations page, distills reusable guidance into <code>data/prompts/outreach_learnings.md</code>, and moves processed iteration notes into the Processed section.</td></tr>
+<tr><td><code>notion_cleanup</code></td><td>Maintains Notion data quality.</td><td>Fills missing domains/account types where possible, supports duplicate review/merge workflows, and keeps Accounts/Contacts usable for deduplication before ranking and upload.</td></tr>
+<tr><td><code>company_phone_enrichment_agent</code></td><td>Fills missing company phone numbers.</td><td>Runs through <code>python agent.py phone-enrich</code>. It scans official websites and contact/legal pages, validates likely company phone numbers, and writes safe updates to Notion Accounts.</td></tr>
+<tr><td><code>supervisor</code></td><td>Creates infrastructure audits.</td><td>Checks file integrity, API usage, pipeline counts, intake health, and campaign analytics. Use it when something feels off or before handing the system to another teammate.</td></tr>
+<tr><td><code>report_generator</code></td><td>Support module for reports.</td><td>Builds report artifacts used by the supervisor/ranking/reporting flows. It is not normally run directly.</td></tr>
+<tr><td><code>linkedin_parser</code></td><td>Support module for LinkedIn HTML.</td><td>Parses saved LinkedIn HTML exports for <code>linkedin_manager</code>. It is not normally run directly.</td></tr>
+<tr><td><code>backfill_contact_status</code></td><td>One-off maintenance agent.</td><td>Backfills missing contact statuses when schema changes or older records need normalization.</td></tr>
+<tr><td><code>ngo_web_discovery</code></td><td>Specialized NGO discovery agent.</td><td>Discovers new German NGOs from public sources, deduplicates against Notion, classifies fit for the NGO invoice-management campaign, and can optionally add matches to Notion.</td></tr>
+<tr><td><code>ngo_scraper</code></td><td>Specialized NGO qualification agent.</td><td>Scans existing NGO Accounts in Notion, classifies whether they distribute funds to local partner organizations, and tags strong fits for the invoice-management campaign.</td></tr>
+<tr><td><code>ngo_email_writer</code></td><td>Specialized NGO copywriter.</td><td>Applies fixed German/English invoice-management outreach templates, splits owners, and writes subject/body fields to Notion for the NGO campaign.</td></tr>
+<tr><td><code>create_impact_hack_drafts.py</code></td><td>Specialized Impact Hack outreach script.</td><td>Creates Notion email copy and Gmail drafts for selected existing contacts in Impact Hack 2026 partner campaigns. Run directly from <code>scripts/</code> when that campaign is active.</td></tr>
 </tbody>
 </table>
 
@@ -504,6 +534,20 @@ python agent.py --help</code></pre>
 <tr><td>Infrastructure audit</td><td>On request</td><td><code>python agent.py supervisor</code></td></tr>
 <tr><td>Feedback analysis</td><td>On request, after enough outcomes</td><td><code>python agent.py feedback</code></td></tr>
 <tr><td>Notion cleanup</td><td>On request</td><td><code>python agent.py cleanup --all</code></td></tr>
+<tr><td>Company phone enrichment</td><td>On request, before comparing contact mobile/company phones or improving Account completeness</td><td><code>python agent.py phone-enrich --dry-run</code></td></tr>
+</tbody>
+</table>
+
+<h3>Direct Specialized Campaign Commands</h3>
+<p>These are included in a fresh clone but are not part of the default corporate Apollo workflow.</p>
+<table>
+<thead><tr><th>Use case</th><th>Command</th></tr></thead>
+<tbody>
+<tr><td>Discover new NGO invoice-management prospects</td><td><code>python -m agents.ngo_web_discovery --dry-run</code></td></tr>
+<tr><td>Classify existing NGO Accounts for invoice-management fit</td><td><code>python -m agents.ngo_scraper --dry-run</code></td></tr>
+<tr><td>Write fixed NGO invoice-management email templates</td><td><code>python -m agents.ngo_email_writer --dry-run</code></td></tr>
+<tr><td>Create Impact Hack 2026 Gmail drafts</td><td><code>python scripts/create_impact_hack_drafts.py --dry-run</code></td></tr>
+<tr><td>Backfill missing Contact Status values</td><td><code>python -m agents.backfill_contact_status --dry-run</code></td></tr>
 </tbody>
 </table>
 
@@ -530,6 +574,7 @@ python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code
 <tr><td>After Apollo</td><td>Upload + copywriter</td><td>Run upload with <code>--sender</code>, then copywrite for the campaign.</td></tr>
 <tr><td>1x per week during active campaign</td><td>LinkedIn follow-up review</td><td>Save the LinkedIn connections page and run <code>python agent.py linkedin --connections-file ...</code>.</td></tr>
 <tr><td>After outcomes accumulate</td><td>Copywriter feedback</td><td>Add examples to the Notion improvement log; run <code>python agent.py feedback</code> when there is enough data.</td></tr>
+<tr><td>Before/after imports</td><td>Phone completeness</td><td>Run <code>python agent.py phone-enrich --dry-run</code>, then run without dry-run if the candidates look correct.</td></tr>
 </tbody>
 </table>
 <p>Recommended calendar blocks:</p>
@@ -563,6 +608,9 @@ python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code
 <tr><td><code>com.tumsocialai.sales-supervisor</code></td><td>Manual (<code>python agent.py supervisor</code>)</td></tr>
 <tr><td><code>com.tumsocialai.enrichment</code></td><td>Manual</td></tr>
 <tr><td><code>com.tumsocialai.copywriter</code></td><td>Manual (<code>python agent.py copywrite --campaign ... --sender ...</code>)</td></tr>
+<tr><td><code>company_phone_enrichment_agent</code></td><td>Manual (<code>python agent.py phone-enrich</code>)</td></tr>
+<tr><td><code>ngo_* agents</code></td><td>Manual, specialized NGO invoice-management campaigns</td></tr>
+<tr><td><code>create_impact_hack_drafts.py</code></td><td>Manual, specialized Impact Hack campaigns</td></tr>
 </tbody>
 </table>
 <p>On macOS, Quick Actions are optional convenience tools. They are not required for teammates using Codex, Claude Code, Antigravity, or Windows.</p>
@@ -575,6 +623,7 @@ python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code
   -&gt; agent.py collect
   -&gt; data/tables/master_input.csv
   -&gt; agent.py rank
+  -&gt; Notion Accounts dedupe by domain, blocklist filtering, shortlist backfill
   -&gt; data/tables/weekly_qualified_leads_with_contacts.csv
   -&gt; data/tables/weekly_qualified_leads_no_contact.csv
   -&gt; data/tables/top_leads_for_apollo_enrichment.csv
@@ -686,7 +735,14 @@ python agent.py linkedin --dry-run --connections-file "network.html"
 # Maintenance on demand
 python agent.py supervisor
 python agent.py feedback --dry-run
-python agent.py cleanup --all</code></pre>
+python agent.py cleanup --all
+python agent.py phone-enrich --dry-run
+
+# Specialized campaign agents
+python -m agents.ngo_web_discovery --dry-run
+python -m agents.ngo_scraper --dry-run
+python -m agents.ngo_email_writer --dry-run
+python scripts/create_impact_hack_drafts.py --dry-run</code></pre>
 
 </body>
 </html>
