@@ -16,10 +16,25 @@ else
     URL="$(pbpaste)"
 fi
 
+URL="$(printf '%s' "$URL" | head -1 | tr -d '[:space:]')"
+
 # Basic validation
 if [[ ! "$URL" == *"linkedin.com"* ]]; then
     echo "Error: Not a LinkedIn URL: $URL"
     exit 1
+fi
+
+if [[ "$URL" == *"…"* || "$URL" == *"[...]"* || "$URL" == *"[…]"* ]]; then
+    echo "Error: Clipboard contains a visually truncated URL. Copy the real LinkedIn post link instead."
+    exit 1
+fi
+
+mkdir -p "$(dirname "$URL_FILE")"
+touch "$URL_FILE"
+
+if grep -Fxq "$URL" "$URL_FILE"; then
+    echo "Already queued: $URL"
+    exit 0
 fi
 
 echo "$URL" >> "$URL_FILE"

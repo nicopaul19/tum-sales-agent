@@ -12,8 +12,8 @@ This repo turns raw partnership signals into ready-to-send outreach:
 
 1. **Collect input** from LinkedIn screenshots, LinkedIn URLs, and manual contact notes.
 2. **Create a top leads report on demand** when the team wants a new campaign shortlist.
-3. **Enrich selected leads in Apollo** manually.
-4. **Upload Apollo exports into Notion** with an explicit campaign sender.
+3. **Run Apollo enrichment review** with `python agent.py apollo-enrich`.
+4. **Upload the strict Apollo-ready CSV into Notion** with an explicit campaign sender.
 5. **Generate outreach copy** for that sender.
 6. **Review LinkedIn connection/follow-up actions** when requested.
 
@@ -26,7 +26,7 @@ The system is intentionally no longer a fixed weekly campaign machine. Campaign 
 | `collector` | Aggregates lead signals into `data/tables/master_input.csv`. | Uses three input streams: LinkedIn screenshots in `data/inputs/images/`, LinkedIn post URLs in `data/inputs/linkedin_urls/`, and manual contact CSVs/notes in `data/inputs/manual_contacts/`. GPT-4o Vision extracts company/person/context from screenshots. LinkedIn URL processing extracts entities, domains, roles, and the specific trigger event. Deduplication uses normalized domain + person name, LinkedIn profile URLs, and a per-company cap so the master table stays campaign-safe. |
 | `ranking_agent` | Creates the on-demand top leads report. | Uses GPT-4o structured scoring from 0-10. The strongest fit is a company similar to proven pipeline successes, with positive social/ecological impact, AI or AI-talent relevance, and evidence of engaging with student organizations in Germany. DACH presence is only a tiebreaker, not a hard requirement. Leads with score >= 5 qualify for the shortlist. |
 | `ranking_agent` filters | Prevents obvious bad leads from entering campaigns. | Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized. |
-| Apollo enrichment | Adds verified company/contact data before Notion upload. | This step is manual in Apollo. It is used after ranking so the team does not spend enrichment effort on weak leads. Apollo exports should include account/contact identifiers, email, title, company domain, LinkedIn, employee/funding fields when available, and campaign-relevant contact rows. |
+| `apollo_enrichment_agent` | Adds verified company/contact data before Notion upload. | The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates `apollo_enrichment_batches.json`, merges Apollo connector/session-log or UI export results into `apollo_enriched_contacts_for_review.csv`, flags senior marketing/recruiting/people contacts that still need a real mobile number, and emits `apollo_upload_ready.csv` with only safe import rows. |
 | `upload_agent` | Uploads Apollo CSVs into Notion Accounts and Contacts. | Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended. |
 | `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus processed `data/prompts/outreach_learnings.md`, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in `partnerships@tum-socialaiclub.de` for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
 | `linkedin_manager` | Reviews LinkedIn connection/follow-up actions. | Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3-5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard. |
@@ -125,7 +125,8 @@ Use `agent.py` for all environments. It works in Codex, Claude Code, Antigravity
 |---|---|---|
 | Process new inputs | After saving screenshots, URLs, or manual leads | `python agent.py collect` |
 | Create top leads report | When the team wants a new campaign shortlist | `python agent.py rank` |
-| Upload Apollo export | After Apollo enrichment | `python agent.py upload --csv "/path/to/apollo.csv" --sender "Full Name"` |
+| Prepare Apollo enrichment review | After ranking / Apollo connector enrichment | `python agent.py apollo-enrich --mcp-json "/path/to/session.jsonl"` |
+| Upload Apollo-ready CSV | After reviewing `apollo_enriched_contacts_for_review.csv` | `python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"` |
 | Generate outreach | After upload | `python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"` |
 | LinkedIn review | After saving LinkedIn network HTML | `python agent.py linkedin --connections-file "/path/to/network.html"` |
 | Infrastructure audit | On request | `python agent.py supervisor` |
@@ -139,7 +140,8 @@ Every campaign needs a sender because the copy should sound like the teammate wh
 Examples:
 
 ```bash
-python agent.py upload --csv "apollo_export.csv" --sender "Nicolas Paul"
+python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"
+python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Nicolas Paul"
 python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"
 ```
 
@@ -157,7 +159,7 @@ Put these as recurring calendar blockers, but execute campaign actions only when
 | Cadence | Blocker | Action |
 |---|---|---|
 | Continuous | LinkedIn input capture | Save promising posts, profiles, screenshots, and manual contacts as you browse. |
-| On campaign start | Input cleanup + top leads + Apollo | Run `python agent.py collect`, scan inputs, run `python agent.py rank`, review the shortlist, then enrich selected leads in Apollo. |
+| On campaign start | Input cleanup + top leads + Apollo | Run `python agent.py collect`, scan inputs, run `python agent.py rank`, run Apollo search/enrichment through the connector, then normalize with `python agent.py apollo-enrich`. |
 | After Apollo | Upload + copywriter | Run upload with `--sender`, then copywrite for the campaign. |
 | 1x per week during active campaign | LinkedIn follow-up review | Save the LinkedIn connections page and run `python agent.py linkedin --connections-file ...`. |
 | After outcomes accumulate | Copywriter feedback | Add examples to the Notion improvement log; run `python agent.py feedback` when there is enough data. |
@@ -203,8 +205,13 @@ LinkedIn screenshots / URLs / manual leads
   -> data/tables/master_input.csv
   -> agent.py rank
   -> data/tables/weekly_qualified_leads_with_contacts.csv
-  -> Apollo enrichment
-  -> agent.py upload --csv ... --sender ...
+  -> data/tables/weekly_qualified_leads_no_contact.csv
+  -> data/tables/top_leads_for_apollo_enrichment.csv
+  -> Apollo connector search/enrichment
+  -> agent.py apollo-enrich --mcp-json ...
+  -> data/tables/apollo_enriched_contacts_for_review.csv
+  -> data/tables/apollo_upload_ready.csv
+  -> agent.py upload --csv data/tables/apollo_upload_ready.csv --sender ...
   -> Notion Accounts / Contacts
   -> agent.py copywrite --campaign ... --sender ...
   -> outreach messages in Notion
@@ -316,8 +323,9 @@ python agent.py collect
 # Campaign shortlist
 python agent.py rank
 
-# Apollo upload
-python agent.py upload --csv "apollo_export.csv" --sender "Full Name"
+# Apollo enrichment review + upload
+python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"
+python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"
 
 # Copywriter
 python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"

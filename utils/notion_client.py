@@ -41,6 +41,34 @@ def clean_value(value):
     return str(value)
 
 
+def normalize_phone_for_compare(value: str) -> str:
+    """Normalize phone-like values enough to catch company/contact duplicates."""
+    value = clean_value(value)
+    if not value:
+        return ""
+    digits = re.sub(r"\D+", "", value)
+    if digits.startswith("00"):
+        digits = digits[2:]
+    return digits
+
+
+def phones_match(left: str, right: str) -> bool:
+    """Return True when two phone values are effectively the same number."""
+    left_norm = normalize_phone_for_compare(left)
+    right_norm = normalize_phone_for_compare(right)
+    if not left_norm or not right_norm:
+        return False
+    return left_norm == right_norm
+
+
+def contact_phone_safe(phone: str, company_phone: str = "") -> str:
+    """Never persist a contact mobile/direct phone that is actually the company phone."""
+    phone = clean_value(phone)
+    if phone and company_phone and phones_match(phone, company_phone):
+        return ""
+    return phone
+
+
 def get_notion_client() -> Optional[Client]:
     """Get authenticated Notion client."""
     if not NOTION_TOKEN:
@@ -702,6 +730,7 @@ def create_contact_in_notion(
     account_page_id: str = "",
     job_title: str = "",
     phone: str = "",
+    company_phone: str = "",
     apollo_contact_id: str = "",
     campaign_sender: str = "",
     database_id: Optional[str] = None,
@@ -715,7 +744,7 @@ def create_contact_in_notion(
         - "LinkedIn" (url)
         - "Email" (email)
         - "Job Title" (rich_text)
-        - "Phone" (phone_number)
+        - "Mob. Phone" (phone_number)
         - "Apollo Contact ID" (rich_text)
         - "Accounts" (relation → Accounts DB)
 
@@ -770,9 +799,10 @@ def create_contact_in_notion(
         if job_title and job_title != "nan":
             properties[_p("Job Title", prop_map)] = {"rich_text": [{"text": {"content": job_title}}]}
 
-        # Phone (phone_number)
-        if phone and phone != "nan":
-            properties[_p("Phone", prop_map)] = {"phone_number": phone}
+        # Mobile/direct phone (phone_number). Do not copy the company phone into the contact.
+        safe_phone = contact_phone_safe(phone, company_phone)
+        if safe_phone and safe_phone != "nan":
+            properties[_p("Mob. Phone", prop_map)] = {"phone_number": safe_phone}
 
         # Apollo Contact ID (rich_text)
         if apollo_contact_id and apollo_contact_id != "nan":
@@ -781,13 +811,16 @@ def create_contact_in_notion(
         if campaign_sender and campaign_sender != "nan":
             properties[_p("Campaign Sender", prop_map)] = {"rich_text": [{"text": {"content": campaign_sender}}]}
 
+        properties[_p("Contact Status", prop_map)] = {"select": {"name": "New"}}
+
+        payload = {
+            "parent": {"database_id": database_id},
+            "properties": properties
+        }
         resp = http_requests.post(
             "https://api.notion.com/v1/pages",
             headers=headers,
-            json={
-                "parent": {"database_id": database_id},
-                "properties": properties
-            }
+            json=payload
         )
 
         if resp.status_code == 200:
@@ -795,6 +828,25 @@ def create_contact_in_notion(
             return True
         else:
             err = resp.json().get("message", resp.text)
+            contact_status_prop = _p("Contact Status", prop_map)
+            if resp.status_code == 400 and contact_status_prop in properties and "Contact Status is not a property" in err:
+                console.print("[yellow]  Contacts DB missing Contact Status; retrying contact creation without status[/yellow]")
+                retry_properties = dict(properties)
+                retry_properties.pop(contact_status_prop, None)
+                retry_resp = http_requests.post(
+                    "https://api.notion.com/v1/pages",
+                    headers=headers,
+                    json={
+                        "parent": {"database_id": database_id},
+                        "properties": retry_properties
+                    }
+                )
+                if retry_resp.status_code == 200:
+                    console.print(f"[green]  Created contact: {person_name}[/green]")
+                    return True
+                err = retry_resp.json().get("message", retry_resp.text)
+                console.print(f"[red]  Contact creation failed: {retry_resp.status_code} - {err}[/red]")
+                return False
             console.print(f"[red]  Contact creation failed: {resp.status_code} - {err}[/red]")
             return False
 
@@ -845,8 +897,10 @@ def ensure_notion_properties(accounts_db_id: str, contacts_db_id: str) -> bool:
 
     # Contacts DB — new properties
     contacts_props = {
+        "Mob. Phone": {"phone_number": {}},
         "Apollo Contact ID": {"rich_text": {}},
         "Campaign Sender": {"rich_text": {}},
+        "Contact Status": {"select": {"options": [{"name": "New"}]}},
     }
 
     success = True
@@ -974,6 +1028,9 @@ def create_account_in_notion(
         _p("Status", prop_map): {
             "status": {"name": _s("Prospect Qualified", status_map)}
         },
+        _p("Account Type*", prop_map): {
+            "select": {"name": "Corporate"}
+        },
     }
 
     # Campaign ID (multi_select)
@@ -1063,12 +1120,13 @@ def create_account_in_notion(
     if v:
         properties[_p("Apollo Account ID", prop_map)] = {"rich_text": [{"text": {"content": v}}]}
 
+    company_phone = clean_value(data.get("company_phone"))
     account_contact_fields = [
         ("person_name", "[Suspect] Contact Name", lambda v: {"rich_text": [{"text": {"content": v}}]}),
         ("linkedin_url", "[Suspect] Contact LinkedIn URL", lambda v: {"url": v} if v.startswith("http") else None),
         ("email", "[Suspect] Contact Email", lambda v: {"rich_text": [{"text": {"content": v}}]}),
         ("job_title", "[Suspect] Job Title", lambda v: {"rich_text": [{"text": {"content": v}}]}),
-        ("phone", "[Suspect] Contact Phone", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("phone", "[Suspect] Contact Phone", lambda v: {"rich_text": [{"text": {"content": contact_phone_safe(v, company_phone)}}]} if contact_phone_safe(v, company_phone) else None),
         ("campaign_sender", "Campaign Sender", lambda v: {"rich_text": [{"text": {"content": v}}]}),
     ]
     for key, prop_name, builder in account_contact_fields:
@@ -1138,6 +1196,9 @@ def update_account_in_notion(
     if reset_status:
         updates[_p("Status", prop_map)] = {"status": {"name": _s("Prospect Qualified", status_map)}}
 
+    # Apollo campaign uploads are corporate outreach accounts.
+    updates[_p("Account Type*", prop_map)] = {"select": {"name": "Corporate"}}
+
     # Campaign ID — append to existing multi_select
     if campaign_id:
         existing_campaigns = []
@@ -1151,6 +1212,7 @@ def update_account_in_notion(
             }
 
     # Map of internal key → (expected Notion property name, builder function)
+    company_phone = clean_value(data.get("company_phone"))
     fill_if_empty = [
         ("cleaned_name", "Cleaned Name*", lambda v: {"rich_text": [{"text": {"content": v}}]}),
         ("website", "Website URL*", lambda v: {"url": v if v.startswith("http") else f"https://{v}"} if ("." in v) else None),
@@ -1169,7 +1231,7 @@ def update_account_in_notion(
         ("linkedin_url", "[Suspect] Contact LinkedIn URL", lambda v: {"url": v} if v.startswith("http") else None),
         ("email", "[Suspect] Contact Email", lambda v: {"rich_text": [{"text": {"content": v}}]}),
         ("job_title", "[Suspect] Job Title", lambda v: {"rich_text": [{"text": {"content": v}}]}),
-        ("phone", "[Suspect] Contact Phone", lambda v: {"rich_text": [{"text": {"content": v}}]}),
+        ("phone", "[Suspect] Contact Phone", lambda v: {"rich_text": [{"text": {"content": contact_phone_safe(v, company_phone)}}]} if contact_phone_safe(v, company_phone) else None),
         ("campaign_sender", "Campaign Sender", lambda v: {"rich_text": [{"text": {"content": v}}]}),
     ]
 

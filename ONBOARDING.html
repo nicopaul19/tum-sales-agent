@@ -289,10 +289,10 @@
       <div class="branch-col">
         <span class="branch-label branch-label-green">✅ Score ≥ 5 — Qualified</span>
 
-        <div class="node node-manual">
-          <div class="node-title">🔍 Apollo enrichment</div>
-          <div class="node-sub">Team enriches shortlisted leads in Apollo.io manually.</div>
-          <span class="node-badge badge-manual">manual</span>
+        <div class="node node-auto">
+          <div class="node-title">🔍 apollo_enrichment_agent</div>
+          <div class="node-sub">Connector results → review CSV + strict upload-ready CSV. Senior marketing/recruiting contacts are blocked until mobile is captured.</div>
+          <span class="node-badge badge-auto"><code>agent.py apollo-enrich</code></span>
         </div>
 
         <div class="connector"><div class="vline"></div><div class="arrow-down"></div></div>
@@ -395,8 +395,8 @@
 <ol>
   <li><strong>Collect input</strong> from LinkedIn screenshots, LinkedIn URLs, and manual contact notes.</li>
   <li><strong>Create a top leads report on demand</strong> when the team wants a new campaign shortlist.</li>
-  <li><strong>Enrich selected leads in Apollo</strong> manually.</li>
-  <li><strong>Upload Apollo exports into Notion</strong> with an explicit campaign sender.</li>
+  <li><strong>Run Apollo enrichment review</strong> with <code>python agent.py apollo-enrich</code>.</li>
+  <li><strong>Upload the strict Apollo-ready CSV into Notion</strong> with an explicit campaign sender.</li>
   <li><strong>Generate outreach copy</strong> for that sender — and automatically create Gmail drafts in <code>partnerships@tum-socialaiclub.de</code>.</li>
   <li><strong>Review LinkedIn connection/follow-up actions</strong> when requested.</li>
 </ol>
@@ -409,7 +409,7 @@
 <tr><td><code>collector</code></td><td>Aggregates lead signals into <code>data/tables/master_input.csv</code>.</td><td>Uses three input streams: LinkedIn screenshots in <code>data/inputs/images/</code>, LinkedIn post URLs in <code>data/inputs/linkedin_urls/</code>, and manual contact CSVs/notes in <code>data/inputs/manual_contacts/</code>. GPT-4o Vision extracts company/person/context from screenshots. LinkedIn URL processing extracts entities, domains, roles, and the specific trigger event. Deduplication uses normalized domain + person name, LinkedIn profile URLs, and a per-company cap so the master table stays campaign-safe.</td></tr>
 <tr><td><code>ranking_agent</code></td><td>Creates the on-demand top leads report.</td><td>Uses GPT-4o structured scoring from 0–10. The strongest fit is a company similar to proven pipeline successes, with positive social/ecological impact, AI or AI-talent relevance, and evidence of engaging with student organizations in Germany. DACH presence is only a tiebreaker, not a hard requirement. Leads with score ≥ 5 qualify for the shortlist.</td></tr>
 <tr><td><code>ranking_agent</code> filters</td><td>Prevents obvious bad leads from entering campaigns.</td><td>Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized.</td></tr>
-<tr><td>Apollo enrichment</td><td>Adds verified company/contact data before Notion upload.</td><td>This step is manual in Apollo. It is used after ranking so the team does not spend enrichment effort on weak leads. Apollo exports should include account/contact identifiers, email, title, company domain, LinkedIn, employee/funding fields when available, and campaign-relevant contact rows.</td></tr>
+<tr><td><code>apollo_enrichment_agent</code></td><td>Adds verified company/contact data before Notion upload.</td><td>The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates <code>apollo_enrichment_batches.json</code>, merges Apollo connector/session-log or UI export results into <code>apollo_enriched_contacts_for_review.csv</code>, flags senior marketing/recruiting/people contacts that still need a real mobile number, and emits <code>apollo_upload_ready.csv</code> with only safe import rows.</td></tr>
 <tr><td><code>upload_agent</code></td><td>Uploads Apollo CSVs into Notion Accounts and Contacts.</td><td>Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended.</td></tr>
 <tr><td><code>copywriter_agent</code></td><td>Generates campaign-specific outreach in Notion <strong>and creates Gmail drafts</strong>.</td><td>Uses the shared outreach skill prompt plus processed <code>data/prompts/outreach_learnings.md</code>, reads unprocessed iterations from the Notion Iterations page and injects them into the prompt, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address. After a successful run it marks the iterations as Processed ✅. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts.</td></tr>
 <tr><td><code>linkedin_manager</code></td><td>Reviews LinkedIn connection/follow-up actions.</td><td>Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3–5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard.</td></tr>
@@ -497,7 +497,8 @@ python agent.py --help</code></pre>
 <tbody>
 <tr><td>Process new inputs</td><td>After saving screenshots, URLs, or manual leads</td><td><code>python agent.py collect</code></td></tr>
 <tr><td>Create top leads report</td><td>When the team wants a new campaign shortlist</td><td><code>python agent.py rank</code></td></tr>
-<tr><td>Upload Apollo export</td><td>After Apollo enrichment</td><td><code>python agent.py upload --csv "/path/to/apollo.csv" --sender "Full Name"</code></td></tr>
+<tr><td>Prepare Apollo enrichment review</td><td>After ranking / Apollo connector enrichment</td><td><code>python agent.py apollo-enrich --mcp-json "/path/to/session.jsonl"</code></td></tr>
+<tr><td>Upload Apollo-ready CSV</td><td>After reviewing <code>apollo_enriched_contacts_for_review.csv</code></td><td><code>python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"</code></td></tr>
 <tr><td>Generate outreach</td><td>After upload</td><td><code>python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code></td></tr>
 <tr><td>LinkedIn review</td><td>After saving LinkedIn network HTML</td><td><code>python agent.py linkedin --connections-file "/path/to/network.html"</code></td></tr>
 <tr><td>Infrastructure audit</td><td>On request</td><td><code>python agent.py supervisor</code></td></tr>
@@ -508,7 +509,8 @@ python agent.py --help</code></pre>
 
 <h3>Campaign Sender</h3>
 <p>Every campaign needs a sender because the copy should sound like the teammate who will actually send it.</p>
-<pre><code>python agent.py upload --csv "apollo_export.csv" --sender "Nicolas Paul"
+<pre><code>python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"
+python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Nicolas Paul"
 python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code></pre>
 <p>The generated messages use:</p>
 <ul>
@@ -524,7 +526,7 @@ python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code
 <thead><tr><th>Cadence</th><th>Blocker</th><th>Action</th></tr></thead>
 <tbody>
 <tr><td>Continuous</td><td>LinkedIn input capture</td><td>Save promising posts, profiles, screenshots, and manual contacts as you browse.</td></tr>
-<tr><td>On campaign start</td><td>Input cleanup + top leads + Apollo</td><td>Run <code>python agent.py collect</code>, scan inputs, run <code>python agent.py rank</code>, review the shortlist, then enrich selected leads in Apollo.</td></tr>
+<tr><td>On campaign start</td><td>Input cleanup + top leads + Apollo</td><td>Run <code>python agent.py collect</code>, scan inputs, run <code>python agent.py rank</code>, run Apollo search/enrichment through the connector, then normalize with <code>python agent.py apollo-enrich</code>.</td></tr>
 <tr><td>After Apollo</td><td>Upload + copywriter</td><td>Run upload with <code>--sender</code>, then copywrite for the campaign.</td></tr>
 <tr><td>1x per week during active campaign</td><td>LinkedIn follow-up review</td><td>Save the LinkedIn connections page and run <code>python agent.py linkedin --connections-file ...</code>.</td></tr>
 <tr><td>After outcomes accumulate</td><td>Copywriter feedback</td><td>Add examples to the Notion improvement log; run <code>python agent.py feedback</code> when there is enough data.</td></tr>
@@ -574,8 +576,13 @@ python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code
   -&gt; data/tables/master_input.csv
   -&gt; agent.py rank
   -&gt; data/tables/weekly_qualified_leads_with_contacts.csv
-  -&gt; Apollo enrichment
-  -&gt; agent.py upload --csv ... --sender ...
+  -&gt; data/tables/weekly_qualified_leads_no_contact.csv
+  -&gt; data/tables/top_leads_for_apollo_enrichment.csv
+  -&gt; Apollo connector search/enrichment
+  -&gt; agent.py apollo-enrich --mcp-json ...
+  -&gt; data/tables/apollo_enriched_contacts_for_review.csv
+  -&gt; data/tables/apollo_upload_ready.csv
+  -&gt; agent.py upload --csv data/tables/apollo_upload_ready.csv --sender ...
   -&gt; Notion Accounts / Contacts
   -&gt; agent.py copywrite --campaign ... --sender ...
   -&gt; outreach messages in Notion + Gmail drafts in partnerships@tum-socialaiclub.de</code></pre>
@@ -664,8 +671,9 @@ python agent.py collect
 # Campaign shortlist
 python agent.py rank
 
-# Apollo upload
-python agent.py upload --csv "apollo_export.csv" --sender "Full Name"
+# Apollo enrichment review + upload
+python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"
+python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"
 
 # Copywriter
 python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"

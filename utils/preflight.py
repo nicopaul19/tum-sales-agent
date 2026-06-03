@@ -84,9 +84,10 @@ EXPECTED_CONTACTS_PROPERTIES: Dict[str, str] = {
     "Email": "email",
     "Accounts": "relation",
     "Job Title": "rich_text",
-    "Phone": "phone_number",
+    "Mob. Phone": "phone_number",
     "Apollo Contact ID": "rich_text",
     "Campaign Sender": "rich_text",
+    "Contact Status": "select",
     # Outreach fields (used by copywriter_agent)
     "LinkedIn 1st Cold": "rich_text",
     "LinkedIn FU message": "rich_text",
