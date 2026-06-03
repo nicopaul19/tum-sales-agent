@@ -13,6 +13,8 @@ IMG_DIR="$PROJECT_DIR/data/inputs/images/new"
 FILENAME="lead_$(date +%Y%m%d_%H%M%S).png"
 FILEPATH="$IMG_DIR/$FILENAME"
 
+mkdir -p "$IMG_DIR"
+
 if [ "$1" = "--window" ]; then
     screencapture -w "$FILEPATH"
 else
