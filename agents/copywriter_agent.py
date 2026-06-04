@@ -46,8 +46,10 @@ from utils.gmail_client import create_draft as gmail_create_draft
 
 console = Console()
 
-# Load the outreach skill prompt
-SKILL_PATH = Path(__file__).parent.parent / "data" / "prompts" / "outreach_skill.md"
+# Load the outreach skill prompt. The data/ path is a local override and is
+# ignored by Git; prompts/ is the clonable default.
+LEGACY_SKILL_PATH = Path(__file__).parent.parent / "data" / "prompts" / "outreach_skill.md"
+TRACKED_SKILL_PATH = Path(__file__).parent.parent / "prompts" / "outreach_skill.md"
 LEARNINGS_PATH = Path(__file__).parent.parent / "data" / "prompts" / "outreach_learnings.md"
 
 DEFAULT_OUTREACH_SKILL_PROMPT = """
@@ -58,8 +60,8 @@ and allergic to vague partnership fluff. Write concise cold LinkedIn messages
 and follow-ups for TUM Social AI.
 
 TUM Social AI is Germany's first AI-for-Good student initiative at TUM. We have
-30+ AI engineers and data scientists building production AI-for-Good systems
-with partners like UN Women, Entreculturas, AWS, and Knowunity.
+50+ AI engineers building real AI applications for nonprofits like the UN,
+partnering with OpenAI, AWS, Knowunity, and more.
 
 Rules:
 - Use the RRR framework: Relevance, Reward, Request.
@@ -71,8 +73,11 @@ Rules:
   and feedback partners.
 - Founder, CEO, and CTO personas care about talent density, product feedback,
   AI ecosystem presence, and credible AI-for-Good positioning.
-- Namedrop only when it supports the recipient's benefit: TUM, UN Women,
-  Entreculturas, AWS, Knowunity.
+- Namedrop only when it supports the recipient's benefit: TUM, the UN,
+  Entreculturas, OpenAI, AWS, Knowunity, Lovable.
+- For generic corporate campaigns, choose ONE partner area and write the ask
+  around that area, e.g. hiring, visibility, product feedback, or API/cloud
+  credits. Do not list all areas in one email.
 - Never use internal labels like company list, Apollo, enrichment, top leads,
   upload-ready, or review CSV.
 - Never use vague filler like synergies, collaboration potential, enhance,
@@ -149,14 +154,16 @@ VARIANT_ADDENDA = {
     "A": (
         "\n\n## A/B TEST VARIANT A — VALUE PROP FRAMING\n"
         "When describing TUM Social AI's work with partners, use this framing:\n"
-        "\"We're developing AI solutions with partners like UN Women\"\n"
-        "Keep it concise and understated. Let the partner name do the heavy lifting."
+        "\"Our 50+ AI engineers build real AI applications for nonprofits like the UN, "
+        "partnering with OpenAI, AWS, and more.\"\n"
+        "Keep it concise and tie the proof to one concrete partner area."
     ),
     "B": (
         "\n\n## A/B TEST VARIANT B — VALUE PROP FRAMING\n"
         "When describing TUM Social AI's work with partners, use this framing:\n"
-        "\"We're multiplying the impact of our non-profit partners like UN Women in over 50 countries through custom AI tools\"\n"
-        "Emphasize the scale and tangible impact. Make the reader feel the reach."
+        "\"Our 50+ AI engineers build real AI applications for nonprofits like the UN, "
+        "partnering with OpenAI, AWS, and more.\"\n"
+        "Then ask around one area, e.g. hiring, visibility, product feedback, or API/cloud credits."
     ),
 }
 
@@ -248,9 +255,13 @@ def validate_outreach(messages: OutreachMessages, include_linkedin: bool = False
 
 def load_skill_prompt() -> str:
     """Load the outreach skill prompt from file."""
-    if SKILL_PATH.exists():
-        return SKILL_PATH.read_text(encoding="utf-8")
-    console.print(f"[yellow]Skill prompt not found at {SKILL_PATH}; using built-in fallback prompt.[/yellow]")
+    for path in (LEGACY_SKILL_PATH, TRACKED_SKILL_PATH):
+        if path.exists():
+            return path.read_text(encoding="utf-8")
+    console.print(
+        f"[yellow]Skill prompt not found at {LEGACY_SKILL_PATH} or {TRACKED_SKILL_PATH}; "
+        "using built-in fallback prompt.[/yellow]"
+    )
     return DEFAULT_OUTREACH_SKILL_PROMPT
 
 
@@ -311,48 +322,48 @@ def persona_strategy(job_title: str) -> str:
         return (
             "Persona: Talent / Recruiting / People\n"
             "- Relevance: hiring AI, software, data, or engineering talent, ideally from current open roles if careers context is provided.\n"
-            "- Reward: direct access to 30+ AI engineers and data scientists at TUM, plus workshop/employer-branding access before they graduate.\n"
+            "- Reward: direct access to 50+ AI engineers at TUM, plus workshop/employer-branding access before they graduate.\n"
             "- Subject direction: 'TUM AI Talent x COMPANY'."
         )
     if any(term in title for term in ("developer relations", "devrel", "community", "field cto")):
         return (
             "Persona: Developer Relations / Technical Community\n"
             "- Relevance: getting real AI builders to use, test, and talk about their developer product or platform.\n"
-            "- Reward: 30+ TUM AI engineers building production AI-for-Good systems, credible power users, workshop audience, and feedback loop.\n"
+            "- Reward: 50+ TUM AI engineers building real AI applications for nonprofits, credible power users, workshop audience, and feedback loop.\n"
             "- Subject direction: 'AI Builders x COMPANY' or 'TUM AI Builders x COMPANY'."
         )
     if any(term in title for term in ("partnership", "business development", "bd", "alliances", "site acquisition")):
         return (
             "Persona: Partnerships / Business Development\n"
             "- Relevance: Munich/TUM AI ecosystem access, co-branded events, campus visibility, and technical student network reach.\n"
-            "- Reward: TUM Social AI already works with partners like AWS, Knowunity, UN Women, and Entreculturas, giving a credible partnership surface.\n"
+            "- Reward: TUM Social AI has 50+ AI engineers building real AI applications for nonprofits like the UN, partnering with OpenAI, AWS, and more.\n"
             "- Subject direction: 'Munich AI Ecosystem x COMPANY'."
         )
     if any(term in title for term in ("marketing", "brand", "communications", "growth", "pr ")):
         return (
             "Persona: Marketing / Brand / Communications\n"
             "- Relevance: more visibility in Munich's technical university and AI ecosystem.\n"
-            "- Reward: campus presence at TUM, co-branded workshops/events, and association with credible AI-for-Good work with names like UN Women.\n"
+            "- Reward: campus presence at TUM, co-branded workshops/events, and association with credible AI-for-Good work with nonprofits like the UN.\n"
             "- Subject direction: 'Munich AI Visibility x COMPANY'."
         )
     if any(term in title for term in ("cto", "technology", "engineering", "product")):
         return (
             "Persona: CTO / Product / Engineering\n"
             "- Relevance: access to strong AI builders as future hires, power users, or technical feedback partners.\n"
-            "- Reward: 30+ TUM AI engineers shipping production-grade AI-for-Good projects, with AWS support and nonprofit partners like UN Women.\n"
+            "- Reward: 50+ TUM AI engineers shipping real AI applications for nonprofits, with OpenAI, AWS, and other technical partners in the ecosystem.\n"
             "- Subject direction: 'TUM AI Builders x COMPANY'."
         )
     if any(term in title for term in ("ceo", "founder", "chief", "c-suite")):
         return (
             "Persona: Founder / CEO / C-suite\n"
             "- Relevance: scaling company presence in the Munich AI ecosystem, hiring density, and credible AI-for-Good positioning.\n"
-            "- Reward: TUM Social AI gives access to 30+ AI engineers, TUM campus visibility, and proof through partners like UN Women, AWS, and Knowunity.\n"
+            "- Reward: TUM Social AI gives access to 50+ AI engineers, TUM campus visibility, and proof through partners like OpenAI, AWS, Knowunity, and nonprofits like the UN.\n"
             "- Subject direction: 'COMPANY x TUM Social AI'."
         )
     return (
         "Persona: General strategic partnerships\n"
         "- Relevance: choose the strongest concrete JTBD from company context: talent, ecosystem visibility, product feedback, or AI-for-Good credibility.\n"
-        "- Reward: TUM campus access, 30+ AI engineers, and named proof from UN Women, AWS, Knowunity, and Entreculturas.\n"
+        "- Reward: TUM campus access, 50+ AI engineers, and named proof from OpenAI, AWS, Knowunity, and nonprofits like the UN.\n"
         "- Subject direction: use the specific value, not a generic trigger."
     )
 
@@ -399,59 +410,51 @@ def build_rrr_cold_email(contact: dict) -> tuple[str, str]:
     title = contact.get("job_title", "")
     kind = persona_kind(title)
     careers_context = (contact.get("careers_context") or "").strip()
+    proof_line = (
+        "Our 50+ AI engineers build real AI applications for nonprofits like the UN, "
+        "partnering with OpenAI, AWS, and more."
+    )
+    request_area = "a partnership"
 
     if kind == "talent":
         subject = f"TUM AI Talent x {company_short}"
         relevance = (
             f"Are you currently hiring AI, software, or engineering talent at {company_short}?"
             if not careers_context
-            else f"I saw {company_short} is hiring technical roles. Is building an early pipeline of AI engineers currently relevant?"
+                else f"I saw {company_short} is hiring technical roles. Is building an early pipeline of AI engineers currently relevant?"
         )
-        reward = (
-            "We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. "
-            "Our 30+ AI engineers and data scientists build projects with partners like UN Women and AWS, "
-            "and many are close to graduation."
-        )
+        reward = f"We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. {proof_line}"
+        request_area = "hiring AI talent"
     elif kind == "devrel":
         subject = f"AI Builders x {company_short}"
         relevance = f"Are you looking for more AI builders to use and stress-test {company_short}'s developer platform?"
-        reward = (
-            "We're TUM Social AI at TUM, with 30+ AI engineers building production AI-for-Good systems. "
-            "Partners like AWS and Knowunity work with us for workshops, feedback, and access to technical students."
-        )
+        reward = f"We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. {proof_line}"
+        request_area = "product feedback from AI builders"
     elif kind in {"partnerships", "marketing"}:
         subject = f"Munich AI Ecosystem x {company_short}"
         relevance = f"Are you trying to build more visibility for {company_short} in the Munich/TUM AI ecosystem?"
-        reward = (
-            "We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. "
-            "With partners like AWS, Knowunity, UN Women, and Entreculturas, we can offer co-branded workshops, "
-            "campus reach, and direct access to 30+ AI engineers."
-        )
+        reward = f"We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. {proof_line}"
+        request_area = "campus visibility"
     elif kind in {"technical_exec", "executive"}:
         subject = f"{company_short} x TUM Social AI"
         if "flare" in trigger or "sustainab" in trigger or "ecolog" in trigger:
             relevance = f"Are you trying to connect {company_short}'s sustainability story with AI talent in Europe?"
         else:
             relevance = f"Are you trying to build a stronger TUM/Munich AI talent and feedback loop for {company_short}?"
-        reward = (
-            "We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. "
-            "Our 30+ AI engineers build real systems with partners like UN Women and AWS, "
-            "which makes us useful for hiring, product feedback, and campus visibility."
-        )
+        reward = f"We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. {proof_line}"
+        request_area = "hiring or visibility"
     else:
         subject = f"{company_short} x TUM Social AI"
         relevance = f"Are talent access or visibility in Munich's AI ecosystem relevant for {company_short} right now?"
-        reward = (
-            "We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. "
-            "Our partners include AWS, Knowunity, UN Women, and Entreculturas, and our 30+ AI engineers "
-            "give partners a direct technical student network."
-        )
+        reward = f"We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. {proof_line}"
+        request_area = "hiring or visibility"
 
     body = (
         f"Hi {first_name},\n\n"
         f"{relevance}\n\n"
         f"{reward}\n\n"
-        f"Would a short call next Monday be relevant for your team?\n\n"
+        f"If {request_area} is currently a priority, would a short call next Monday be relevant "
+        "to explore how we could set up a partnership together?\n\n"
         f"{sender}"
     )
     return subject, body

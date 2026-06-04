@@ -1,5 +1,5 @@
 """
-Create Impact Hack 2026 outreach drafts for selected Notion contacts.
+Create AI for Good Hackathon - Africa Edition outreach drafts for selected Notion contacts.
 
 Scope:
 - Contacts linked to accounts in the configured target campaigns.
@@ -59,21 +59,24 @@ ALLOWED_ACCOUNT_STATUSES = {
 }
 
 EVENT_FACTS = """
-Impact Hack 2026 is an AI-for-Good hackathon in Munich on 27-28 June 2026.
-It will host 100-150 participants at TUM Munich, Lecture Hall 1100 and Immatrikulationshalle.
-The organizers are TUM Social AI, TUM.ai, NamibAI, and Studierendenforum im Toenissteiner Kreis.
-OpenAI and Lovable are already supporting the event with ChatGPT Pro, API credits, and Lovable credits.
-The hackathon brings students from TUM, LMU, HM and beyond, across CS, engineering, law, policy, social sciences, and business.
-Challenges focus on solving real-world problems for nonprofit partners like the United Nations and VENRO, covering humanitarian crises, development cooperation, conservation, animal welfare in Africa, and Women in AI.
-Partner opportunities include keynote stage visibility, challenge tracks, booth space, CV access, social media presence, tech-stack/API/cloud-credit support, and sponsorship.
+AI for Good Hackathon - Africa Edition takes place on June 27-28, 2026 at TUM Munich.
+It is organized by NamibAI, TUM Social AI Club, and TUM.ai.
+Participant registration is open until June 20, 2026 at https://luma.com/0gsxudfu.
+The event is positioned as Munich's largest AI for Good Hackathon.
+Students will work on real-world challenges faced by African non-profits, not theoretical case studies.
+The best ideas will be implemented and flow directly into the daily work of the non-profits.
+Winners will be invited to an exclusive follow-up event.
+Participants get exclusive free access to the latest AI tools from OpenAI and the app-building platform Lovable.
+The audience includes students from Computer Science, Economics/Business Administration, Law, Political Science, Social Sciences, and related disciplines.
+Interdisciplinary teams are encouraged, including students from non-technical backgrounds.
+Partner opportunities include sponsorship, tech-stack/API/cloud-credit support, keynote-stage visibility, booth presence, exclusive CV access, social media reach inside Munich's AI ecosystem, and a concrete role in helping winning teams move into implementation.
 """.strip()
 
 HACKATHON_TRIGGER = (
-    "Upcoming Impact Hackathon in Munich on 27-28 June under the motto "
-    "\"Code. Collaborate. Create Impact.\" Expected 100-150 students from "
-    "TUM, LMU and HM; organized by TUM Social AI, TUM.ai, NamibAI and "
-    "Studierendenforum, with OpenAI and Lovable supporting the tech stack. "
-    "Challenges focus on real-world problems for nonprofit partners like the United Nations and VENRO."
+    "AI for Good Hackathon - Africa Edition on June 27-28, 2026 at TUM Munich, "
+    "organized by NamibAI, TUM Social AI Club, and TUM.ai. Students will build "
+    "real AI concepts for African non-profits with OpenAI and Lovable access; "
+    "the best ideas will be implemented into the non-profits' daily work."
 )
 
 
@@ -356,13 +359,13 @@ def persona_hint(job_title: str, campaigns: Iterable[str]) -> str:
     title = (job_title or "").lower()
     campaign_set = set(campaigns)
     if any(term in title for term in ["talent", "recruit", "people", "hr", "employer"]):
-        return "Talent/recruiting: emphasize CV access, booth/workshop options, and direct visibility among TUM/LMU/HM builders."
+        return "Talent/recruiting: emphasize CV access, booth/workshop options, and direct visibility among interdisciplinary Munich AI builders."
     if any(term in title for term in ["brand", "marketing", "communication", "community", "events"]):
         return "Brand/marketing: emphasize keynote stage, booth, social media, and campus ecosystem visibility."
     if any(term in title for term in ["sustain", "csr", "impact", "esg"]):
-        return "Impact/CSR: emphasize AI-for-Good, nonprofit challenges, Women in AI, and measurable social-impact visibility."
+        return "Impact/CSR: emphasize AI-for-Good, African nonprofit challenges, and measurable social-impact visibility."
     if any(term in title for term in ["engineer", "product", "developer", "cto", "technical"]):
-        return "Product/engineering: emphasize OpenAI/Lovable stack, challenge track/workshop, and technical students as power users."
+        return "Product/engineering: emphasize OpenAI/Lovable tooling, challenge track/workshop, and AI builders as power users."
     if any(term in title for term in ["founder", "ceo", "coo", "cmo", "chief", "partner", "business development", "bd"]):
         return "Leadership/partnerships: emphasize strategic partner/sponsor positioning in Munich's AI-for-Good ecosystem."
     if "Corporates_AIJobs_2511" in campaign_set:
@@ -418,7 +421,7 @@ def template_angle(record: ContactRecord) -> str:
     if any(term in title for term in ["sustain", "csr", "impact", "esg"]):
         return (
             f"For {company}, this could be a strong CSR and impact play: visible support for "
-            "AI-for-Good, Women in AI and student teams tackling real nonprofit challenges."
+            "AI-for-Good and student teams tackling real challenges for African non-profits."
         )
     if any(term in title for term in ["engineer", "product", "developer", "cto", "technical"]):
         return (
@@ -428,7 +431,7 @@ def template_angle(record: ContactRecord) -> str:
     if any(term in title for term in ["founder", "ceo", "coo", "cmo", "chief", "partner", "business development", "bd"]):
         return (
             f"For {company}, this could be a clean Munich ecosystem play: stage visibility, "
-            "challenge-track ownership and access to a very relevant TUM/LMU/HM crowd."
+            "challenge-track ownership and access to a highly relevant interdisciplinary student crowd."
         )
     if "Corporates_TUMaffiliation_310925" in campaign_set:
         return (
@@ -447,21 +450,20 @@ def generate_template_email(record: ContactRecord, sender: str = "") -> EmailDra
     sender_name = (sender or record.sender_name or DEFAULT_CAMPAIGN_SENDER or "Felix Laumann").strip()
     body = (
         f"Hi {greeting},\n\n"
-        f"are you currently trying to get more visibility in the Munich University Eco-System for {company}? "
-        "We have our first Impact Hackathon coming up in Munich on 27-28 June under the motto "
-        "\"Code. Collaborate. Create Impact.\" We expect 100-150 students from TUM, LMU and HM, "
-        "with TUM Social AI, TUM.ai, NamibAI and Studierendenforum behind it, plus OpenAI and Lovable "
-        "already supporting the tech stack. The challenges will be focused on solving real-world problems "
-        "for our nonprofit partners like the United Nations or VENRO.\n\n"
+        f"are you currently trying to get more visibility in the Munich university ecosystem for {company}? "
+        "We are hosting the AI for Good Hackathon - Africa Edition on June 27-28, 2026 at TUM Munich "
+        "together with NamibAI and TUM.ai. It is positioned as Munich's largest AI for Good Hackathon, "
+        "with interdisciplinary students building real AI concepts for African non-profits using OpenAI "
+        "and Lovable tools. Participant registration closes June 20: https://luma.com/0gsxudfu\n\n"
         f"{template_angle(record)}\n\n"
         "We are looking for sponsors and tech-stack/API/cloud-credit partners. In return we can offer "
-        "keynote-stage visibility, setting up a booth at the Immatrikulationshalle, exclusive CV access "
-        "and social media reach inside Munich's AI ecosystem.\n\n"
+        "keynote-stage visibility, booth presence, exclusive CV access, social media reach inside "
+        "Munich's AI ecosystem and a concrete role in helping winning teams move into implementation.\n\n"
         "Would a partner slot be relevant for your team?\n\n"
         "Best\n"
         f"{sender_name}"
     )
-    return EmailDraft(subject=f"Impact Hackathon x {company}: Collaboration Opportunity", body=body)
+    return EmailDraft(subject=f"AI for Good Hackathon x {company}", body=body)
 
 
 def prompt_for(record: ContactRecord, sender: str) -> str:
@@ -515,11 +517,13 @@ SENDER:
 
 RULES:
 - Plain English.
-- Subject should be short, specific, and usually include "Impact Hack" plus the company name.
-- Body max 115 words including greeting and sign-off.
+- Subject should be short, specific, and usually include "AI for Good Hackathon" plus the company name.
+- Body max 170 words including greeting and sign-off.
 - Start with "Hi {greeting},".
 - Keep it lean, concrete, and excited.
-- Use namedropping naturally: TUM, TUM.ai, TUM Social AI, OpenAI, Lovable, NamibAI, Studierendenforum, TUM/LMU/HM, UN/VENRO, Women in AI.
+- Use namedropping naturally: TUM Munich, TUM.ai, TUM Social AI Club, OpenAI, Lovable, NamibAI, African non-profits, interdisciplinary students.
+- Use the hackathon as the trigger event. Do not fall back to the generic corporate proof line unless it supports the event-specific ask.
+- Mention the June 27-28, 2026 date and the June 20 registration deadline when it fits naturally.
 - Include at least one company/persona-specific sentence.
 - CTA should ask whether partnering, sponsoring, or taking a concrete event role is relevant for their team.
 - No emojis. No em dash or en dash. No placeholders. Do not invent company facts.
@@ -678,7 +682,7 @@ def write_audit(records: list[ContactRecord], dry_run: bool) -> Path:
 
 
 def show_summary(records: list[ContactRecord], audit_path: Path) -> None:
-    table = Table(title="Impact Hack Draft Batch")
+    table = Table(title="AI for Good Hackathon Draft Batch")
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
     table.add_row("Contact records", str(len(records)))
@@ -693,7 +697,7 @@ def show_summary(records: list[ContactRecord], audit_path: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create Impact Hack 2026 outreach drafts")
+    parser = argparse.ArgumentParser(description="Create AI for Good Hackathon - Africa Edition outreach drafts")
     parser.add_argument("--dry-run", action="store_true", help="Generate only, do not write to Notion or Gmail")
     parser.add_argument("--limit", type=int, default=0, help="Limit records for testing")
     parser.add_argument("--sender", default="", help="Optional override sender for every draft")
