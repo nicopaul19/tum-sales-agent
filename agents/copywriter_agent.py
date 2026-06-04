@@ -50,6 +50,38 @@ console = Console()
 SKILL_PATH = Path(__file__).parent.parent / "data" / "prompts" / "outreach_skill.md"
 LEARNINGS_PATH = Path(__file__).parent.parent / "data" / "prompts" / "outreach_learnings.md"
 
+DEFAULT_OUTREACH_SKILL_PROMPT = """
+# TUM Social AI Outreach Copywriter
+
+You write like a YC-level Head of Sales: direct, specific, commercially sharp,
+and allergic to vague partnership fluff. Write concise cold LinkedIn messages
+and follow-ups for TUM Social AI.
+
+TUM Social AI is Germany's first AI-for-Good student initiative at TUM. We have
+30+ AI engineers and data scientists building production AI-for-Good systems
+with partners like UN Women, Entreculturas, AWS, and Knowunity.
+
+Rules:
+- Use the RRR framework: Relevance, Reward, Request.
+- Lead with the recipient's job-to-be-done, not a generic compliment.
+- Talent personas care about hiring AI, software, data, and engineering talent.
+- Partnerships, BD, marketing, and brand personas care about Munich/TUM AI
+  ecosystem visibility, co-branded workshops, and campus reach.
+- DevRel and technical personas care about real AI builders as users, testers,
+  and feedback partners.
+- Founder, CEO, and CTO personas care about talent density, product feedback,
+  AI ecosystem presence, and credible AI-for-Good positioning.
+- Namedrop only when it supports the recipient's benefit: TUM, UN Women,
+  Entreculturas, AWS, Knowunity.
+- Never use internal labels like company list, Apollo, enrichment, top leads,
+  upload-ready, or review CSV.
+- Never use vague filler like synergies, collaboration potential, enhance,
+  innovative, on your radar, or interesting.
+- Keep LinkedIn messages under 75 words and follow-ups under 60 words.
+- Use "relevant" in CTAs, never "interesting".
+- Do not use em dashes.
+""".strip()
+
 # Career page paths to try when fetching job openings
 CAREERS_PATHS = ["/careers", "/jobs", "/karriere", "/stellenangebote", "/join", "/open-positions", "/join-us"]
 
@@ -138,20 +170,88 @@ class OutreachMessages(BaseModel):
         description="Follow-up LinkedIn message if no reply after 3-5 days. Max 60 words. MUST reference the same hook/topic from the cold message. Only use facts ALREADY mentioned in the cold message or provided in the contact context. NEVER invent new projects, partnerships, awards, or achievements."
     )
     cold_email_subject: str = Field(
-        description="Cold email subject line. Max 8 words. Lowercase, descriptive, not clickbait."
+        description="Cold email subject line. Max 7 words. Concrete value, not clickbait or internal trigger labels."
     )
     cold_email_body: str = Field(
-        description="Cold email body. Max 100 words. Mobile-optimized short paragraphs."
+        description="Cold email body. Max 90 words. RRR structure: relevance, reward, concrete request."
     )
+
+
+BANNED_CUSTOMER_COPY_TERMS = [
+    "company list",
+    "list appearance",
+    "top leads",
+    "apollo",
+    "enrichment",
+    "upload-ready",
+    "review csv",
+    "joining forces",
+    "enhance",
+    "enhanc",
+    "capabilities",
+    "explore synergies",
+    "synergy",
+    "synergies",
+    "collaboration potential",
+    "potential collaboration",
+    "aligns well",
+    "alignment",
+    "innovative",
+    "on your radar",
+    "resonate",
+    "mutual engagement",
+    "i tried connecting",
+    "interesting",
+]
+
+
+def word_count(text: str) -> int:
+    return len(re.findall(r"\b[\w'-]+\b", text or ""))
+
+
+def validate_outreach(messages: OutreachMessages, include_linkedin: bool = False) -> list[str]:
+    """Return human-readable quality issues for generated outreach copy."""
+    fields = {
+        "cold_email_subject": messages.cold_email_subject,
+        "cold_email_body": messages.cold_email_body,
+    }
+    if include_linkedin:
+        fields["linkedin_first_cold"] = messages.linkedin_first_cold
+        fields["linkedin_follow_up"] = messages.linkedin_follow_up
+    issues: list[str] = []
+
+    for field, text in fields.items():
+        lowered = (text or "").lower()
+        for term in BANNED_CUSTOMER_COPY_TERMS:
+            if term in lowered:
+                issues.append(f"{field} contains banned phrase: {term}")
+
+    subject = messages.cold_email_subject or ""
+    subject_lower = subject.lower()
+    if "||" in subject or "tum social ai:" in subject_lower:
+        issues.append("cold_email_subject uses stale rigid subject format")
+    if word_count(subject) > 7:
+        issues.append("cold_email_subject is longer than 7 words")
+
+    email_lower = (messages.cold_email_body or "").lower()
+    if "short call" not in email_lower:
+        issues.append("cold_email_body must ask for a short call")
+    if "next monday" not in email_lower and "next tuesday" not in email_lower and "next week" not in email_lower:
+        issues.append("cold_email_body must anchor the call to next Monday, Tuesday, or next week")
+    if "relevant" not in email_lower:
+        issues.append("cold_email_body CTA must use relevant")
+    if word_count(messages.cold_email_body) > 100:
+        issues.append("cold_email_body is longer than 100 words")
+
+    return issues
 
 
 def load_skill_prompt() -> str:
     """Load the outreach skill prompt from file."""
     if SKILL_PATH.exists():
         return SKILL_PATH.read_text(encoding="utf-8")
-    else:
-        console.print(f"[red]Error: Skill prompt not found at {SKILL_PATH}[/red]")
-        return ""
+    console.print(f"[yellow]Skill prompt not found at {SKILL_PATH}; using built-in fallback prompt.[/yellow]")
+    return DEFAULT_OUTREACH_SKILL_PROMPT
 
 
 def assign_variant() -> str:
@@ -204,7 +304,160 @@ def fetch_careers_context(website: str) -> str:
     return ""
 
 
-def build_contact_prompt(contact: dict) -> str:
+def persona_strategy(job_title: str) -> str:
+    """Return concrete sales guidance for the contact's likely job-to-be-done."""
+    title = (job_title or "").lower()
+    if any(term in title for term in ("talent", "recruit", "hiring", "people", "human resource", "hr")):
+        return (
+            "Persona: Talent / Recruiting / People\n"
+            "- Relevance: hiring AI, software, data, or engineering talent, ideally from current open roles if careers context is provided.\n"
+            "- Reward: direct access to 30+ AI engineers and data scientists at TUM, plus workshop/employer-branding access before they graduate.\n"
+            "- Subject direction: 'TUM AI Talent x COMPANY'."
+        )
+    if any(term in title for term in ("developer relations", "devrel", "community", "field cto")):
+        return (
+            "Persona: Developer Relations / Technical Community\n"
+            "- Relevance: getting real AI builders to use, test, and talk about their developer product or platform.\n"
+            "- Reward: 30+ TUM AI engineers building production AI-for-Good systems, credible power users, workshop audience, and feedback loop.\n"
+            "- Subject direction: 'AI Builders x COMPANY' or 'TUM AI Builders x COMPANY'."
+        )
+    if any(term in title for term in ("partnership", "business development", "bd", "alliances", "site acquisition")):
+        return (
+            "Persona: Partnerships / Business Development\n"
+            "- Relevance: Munich/TUM AI ecosystem access, co-branded events, campus visibility, and technical student network reach.\n"
+            "- Reward: TUM Social AI already works with partners like AWS, Knowunity, UN Women, and Entreculturas, giving a credible partnership surface.\n"
+            "- Subject direction: 'Munich AI Ecosystem x COMPANY'."
+        )
+    if any(term in title for term in ("marketing", "brand", "communications", "growth", "pr ")):
+        return (
+            "Persona: Marketing / Brand / Communications\n"
+            "- Relevance: more visibility in Munich's technical university and AI ecosystem.\n"
+            "- Reward: campus presence at TUM, co-branded workshops/events, and association with credible AI-for-Good work with names like UN Women.\n"
+            "- Subject direction: 'Munich AI Visibility x COMPANY'."
+        )
+    if any(term in title for term in ("cto", "technology", "engineering", "product")):
+        return (
+            "Persona: CTO / Product / Engineering\n"
+            "- Relevance: access to strong AI builders as future hires, power users, or technical feedback partners.\n"
+            "- Reward: 30+ TUM AI engineers shipping production-grade AI-for-Good projects, with AWS support and nonprofit partners like UN Women.\n"
+            "- Subject direction: 'TUM AI Builders x COMPANY'."
+        )
+    if any(term in title for term in ("ceo", "founder", "chief", "c-suite")):
+        return (
+            "Persona: Founder / CEO / C-suite\n"
+            "- Relevance: scaling company presence in the Munich AI ecosystem, hiring density, and credible AI-for-Good positioning.\n"
+            "- Reward: TUM Social AI gives access to 30+ AI engineers, TUM campus visibility, and proof through partners like UN Women, AWS, and Knowunity.\n"
+            "- Subject direction: 'COMPANY x TUM Social AI'."
+        )
+    return (
+        "Persona: General strategic partnerships\n"
+        "- Relevance: choose the strongest concrete JTBD from company context: talent, ecosystem visibility, product feedback, or AI-for-Good credibility.\n"
+        "- Reward: TUM campus access, 30+ AI engineers, and named proof from UN Women, AWS, Knowunity, and Entreculturas.\n"
+        "- Subject direction: use the specific value, not a generic trigger."
+    )
+
+
+def persona_kind(job_title: str) -> str:
+    """Classify the contact persona for deterministic RRR email copy."""
+    title = (job_title or "").lower()
+    if any(term in title for term in ("talent", "recruit", "hiring", "people", "human resource", "hr")):
+        return "talent"
+    if any(term in title for term in ("developer relations", "devrel", "community", "field cto")):
+        return "devrel"
+    if any(term in title for term in ("partnership", "business development", "bd", "alliances", "site acquisition")):
+        return "partnerships"
+    if any(term in title for term in ("marketing", "brand", "communications", "growth", "pr ")):
+        return "marketing"
+    if any(term in title for term in ("cto", "technology", "engineering", "product")):
+        return "technical_exec"
+    if any(term in title for term in ("ceo", "founder", "chief", "c-suite")):
+        return "executive"
+    return "general"
+
+
+def subject_company_name(company_name: str) -> str:
+    """Return a short readable company name for subjects."""
+    name = re.sub(r"\s*\([^)]*\)", "", company_name or "").strip()
+    name = re.split(r"\s+[–-]\s+", name)[0].strip()
+    return name or (company_name or "your team")
+
+
+def build_rrr_cold_email(contact: dict) -> tuple[str, str]:
+    """
+    Build a deterministic RRR cold email for corporate outreach.
+
+    The model still writes LinkedIn copy, but email drafts are the highest-risk
+    deliverable. This keeps them short, concrete, persona-relevant, and free of
+    internal workflow language.
+    """
+    person_name = contact.get("person_name", "") or ""
+    first_name = person_name.split()[0] if person_name else "there"
+    company = contact.get("company_name", "") or "your team"
+    company_short = subject_company_name(company)
+    sender = contact.get("campaign_sender") or DEFAULT_CAMPAIGN_SENDER or ""
+    trigger = (contact.get("trigger") or "").lower()
+    title = contact.get("job_title", "")
+    kind = persona_kind(title)
+    careers_context = (contact.get("careers_context") or "").strip()
+
+    if kind == "talent":
+        subject = f"TUM AI Talent x {company_short}"
+        relevance = (
+            f"Are you currently hiring AI, software, or engineering talent at {company_short}?"
+            if not careers_context
+            else f"I saw {company_short} is hiring technical roles. Is building an early pipeline of AI engineers currently relevant?"
+        )
+        reward = (
+            "We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. "
+            "Our 30+ AI engineers and data scientists build projects with partners like UN Women and AWS, "
+            "and many are close to graduation."
+        )
+    elif kind == "devrel":
+        subject = f"AI Builders x {company_short}"
+        relevance = f"Are you looking for more AI builders to use and stress-test {company_short}'s developer platform?"
+        reward = (
+            "We're TUM Social AI at TUM, with 30+ AI engineers building production AI-for-Good systems. "
+            "Partners like AWS and Knowunity work with us for workshops, feedback, and access to technical students."
+        )
+    elif kind in {"partnerships", "marketing"}:
+        subject = f"Munich AI Ecosystem x {company_short}"
+        relevance = f"Are you trying to build more visibility for {company_short} in the Munich/TUM AI ecosystem?"
+        reward = (
+            "We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. "
+            "With partners like AWS, Knowunity, UN Women, and Entreculturas, we can offer co-branded workshops, "
+            "campus reach, and direct access to 30+ AI engineers."
+        )
+    elif kind in {"technical_exec", "executive"}:
+        subject = f"{company_short} x TUM Social AI"
+        if "flare" in trigger or "sustainab" in trigger or "ecolog" in trigger:
+            relevance = f"Are you trying to connect {company_short}'s sustainability story with AI talent in Europe?"
+        else:
+            relevance = f"Are you trying to build a stronger TUM/Munich AI talent and feedback loop for {company_short}?"
+        reward = (
+            "We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. "
+            "Our 30+ AI engineers build real systems with partners like UN Women and AWS, "
+            "which makes us useful for hiring, product feedback, and campus visibility."
+        )
+    else:
+        subject = f"{company_short} x TUM Social AI"
+        relevance = f"Are talent access or visibility in Munich's AI ecosystem relevant for {company_short} right now?"
+        reward = (
+            "We're TUM Social AI, Germany's first AI-for-Good student initiative at TUM. "
+            "Our partners include AWS, Knowunity, UN Women, and Entreculturas, and our 30+ AI engineers "
+            "give partners a direct technical student network."
+        )
+
+    body = (
+        f"Hi {first_name},\n\n"
+        f"{relevance}\n\n"
+        f"{reward}\n\n"
+        f"Would a short call next Monday be relevant for your team?\n\n"
+        f"{sender}"
+    )
+    return subject, body
+
+
+def build_contact_prompt(contact: dict, campaign_id: str = "") -> str:
     """
     Build the user prompt for GPT-4o with all available contact + account context.
 
@@ -281,9 +534,12 @@ def build_contact_prompt(contact: dict) -> str:
         lines.append(f"- {careers_context[:1500]}")
         lines.append("- Use this to craft a specific, relevant hook if their job openings match our talent pool")
 
+    lines.append("\n## PERSONA-SPECIFIC STRATEGY")
+    lines.append(persona_strategy(job_title))
+
     lines.append("\n## LANGUAGE")
     contact_country_lower = (country or "").lower().strip()
-    if contact_country_lower in DACH_COUNTRIES:
+    if campaign_id == "NGO_180526_InvoiceManagement" and contact_country_lower in DACH_COUNTRIES:
         lines.append("- Write ALL messages in GERMAN (Deutsch)")
         lines.append("- Use formal 'Sie' for NGO and institutional contacts")
         lines.append("- Sign off emails with 'Viele Grüße' followed by sender name")
@@ -292,13 +548,20 @@ def build_contact_prompt(contact: dict) -> str:
 
     lines.append("\n## INSTRUCTIONS")
     lines.append("- Follow the OUTREACH SKILL rules exactly")
+    lines.append("- Act like a YC-level Head of Sales: concise, commercially sharp, persona-relevant, and allergic to vague partnership language")
+    lines.append("- Use the RRR framework: Relevance (persona JTBD or trigger), Reward (proof/namedrops tied to their benefit), Request (short call next week with a concrete day anchor)")
     lines.append("- Each message MUST reference something specific about this company or contact")
+    lines.append("- Prioritize careers page openings over weak triggers like 'company list' or 'list appearance'")
+    lines.append("- If the trigger says 'company list', 'list appearance', or similar internal wording, ignore that phrase and infer the strongest persona-based hook from job title, careers context, company description, and industry")
     lines.append("- LinkedIn 1st Cold: max 75 words")
     lines.append("- LinkedIn FU: max 60 words, SAME hook/topic as cold message. Only reference facts from the cold message or from the CONTACT/COMPANY context above. NEVER invent new projects, partnerships, awards, or achievements that aren't explicitly provided.")
-    lines.append("- Cold Email Subject: MUST exactly follow this format: 'COMPANY_NAME || TUM Social AI: TRIGGER_TOPIC'")
-    lines.append(f"- Cold Email Body: max 100 words, sign with ONLY '{sender_full_name}'. Do NOT include titles or links.")
+    lines.append("- Cold Email Subject: max 7 words. Use a concrete value pattern like 'TUM AI Talent x COMPANY' or 'Munich AI Ecosystem x COMPANY'. NEVER use 'Company List', 'List Appearance', or 'Collaboration Potential'.")
+    lines.append(f"- Cold Email Body: max 90 words, sign with ONLY '{sender_full_name}'. Do NOT include titles or links.")
+    lines.append("- Cold Email CTA: ask for a short call next week with a concrete anchor, e.g. next Monday or Tuesday. Use 'relevant'; never use 'interesting'.")
     lines.append(f"- LinkedIn sign-off: 'Best, {sender_first_name}'")
     lines.append("- Be SPECIFIC about what this company does — never use generic terms like 'IT services' or 'technology sector'")
+    lines.append("- Never write: 'joining forces', 'enhance your tech strategies', 'explore synergies', 'collaboration potential', 'aligns well' without a concrete reason, or 'I tried connecting over LinkedIn'")
+    lines.append("- Use only concrete partner assets: talent pipeline, TUM campus visibility, Munich AI ecosystem, technical workshops, API/cloud-credit partnership, product feedback from AI builders, CSR/AI-for-Good credibility")
 
     return "\n".join(lines)
 
@@ -316,7 +579,7 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
     Returns:
         OutreachMessages with the 4 generated messages.
     """
-    user_prompt = build_contact_prompt(contact)
+    user_prompt = build_contact_prompt(contact, campaign_id=campaign_id)
 
     # Build full system prompt: skill + campaign override + variant addendum + learnings
     full_system_prompt = skill_prompt
@@ -328,21 +591,49 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
     if learnings:
         full_system_prompt += learnings
 
-    response = client.beta.chat.completions.parse(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": full_system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        response_format=OutreachMessages,
-        max_tokens=2000,
-    )
+    last_result = None
+    last_usage = None
+    quality_feedback = ""
+    for attempt in range(1, 4):
+        response = client.beta.chat.completions.parse(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": full_system_prompt},
+                {"role": "user", "content": user_prompt + quality_feedback}
+            ],
+            response_format=OutreachMessages,
+            max_tokens=2000,
+        )
 
-    result = response.choices[0].message.parsed
+        result = response.choices[0].message.parsed
+        if campaign_id != "NGO_180526_InvoiceManagement":
+            subject, body = build_rrr_cold_email(contact)
+            result = OutreachMessages(
+                linkedin_first_cold=result.linkedin_first_cold,
+                linkedin_follow_up=result.linkedin_follow_up,
+                cold_email_subject=subject,
+                cold_email_body=body,
+            )
+        last_result = result
+        last_usage = response.usage
+        issues = validate_outreach(result)
+        if not issues:
+            break
+        quality_feedback = (
+            "\n\n## QUALITY GATE FAILED\n"
+            "Rewrite all four messages and fix these issues before returning final copy:\n"
+            + "\n".join(f"- {issue}" for issue in issues)
+            + "\nUse concrete RRR copy only. No vague sales filler."
+        )
+        console.print(f"  [yellow]Quality retry {attempt}/3: {len(issues)} issue(s)[/yellow]")
+
+    result = last_result
+    if result is None:
+        raise RuntimeError("OpenAI returned no outreach result")
 
     log_api_usage(
         "copywriter_agent", "generate_outreach", "gpt-4o",
-        response.usage,
+        last_usage,
         {
             "contact": contact.get("person_name", ""),
             "company": contact.get("company_name", ""),
@@ -350,6 +641,10 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
             "sender": contact.get("campaign_sender", ""),
         }
     )
+
+    final_issues = validate_outreach(result)
+    if final_issues:
+        raise ValueError("Generated copy failed quality gate: " + "; ".join(final_issues))
 
     return result
 
