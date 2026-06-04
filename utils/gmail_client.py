@@ -8,6 +8,7 @@ Auth: gmail_token.json must exist (run setup_gmail_auth.py once to generate it).
 """
 import base64
 import email as email_lib
+from email.utils import getaddresses
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from pathlib import Path
@@ -56,12 +57,84 @@ def _get_gmail_service():
         return None
 
 
+def _header_value(message: dict, name: str) -> str:
+    """Return a Gmail message header value by case-insensitive name."""
+    target = name.lower()
+    for header in message.get("payload", {}).get("headers", []):
+        if header.get("name", "").lower() == target:
+            return header.get("value", "")
+    return ""
+
+
+def _payload_has_attachment(payload: dict) -> bool:
+    """Return True if a Gmail payload contains attachment filenames."""
+    if payload.get("filename"):
+        return True
+    return any(_payload_has_attachment(part) for part in payload.get("parts", []) or [])
+
+
+def _draft_recipient_emails(message: dict) -> set[str]:
+    """Extract normalized recipient emails from a draft message."""
+    recipients = []
+    for header_name in ("to", "cc", "bcc"):
+        recipients.extend(getaddresses([_header_value(message, header_name)]))
+    return {email.lower().strip() for _, email in recipients if email}
+
+
+def _build_raw_message(to_email: str, subject: str, body: str) -> str:
+    """Build a base64url encoded Gmail MIME message."""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"{SENDER_DISPLAY} <{SENDER_ADDRESS}>"
+    msg["To"] = to_email
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+    return base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
+
+
+def find_existing_draft(service, to_email: str) -> Optional[str]:
+    """
+    Find the newest attachment-free draft from the partnerships alias to a recipient.
+
+    This keeps forced copywriter reruns from creating duplicate Gmail drafts. We
+    intentionally match by exact recipient email and sender alias only.
+    """
+    target = (to_email or "").lower().strip()
+    if not target:
+        return None
+
+    page_token = None
+    while True:
+        params = {"userId": "me", "maxResults": 100}
+        if page_token:
+            params["pageToken"] = page_token
+        response = service.users().drafts().list(**params).execute()
+        for draft in response.get("drafts", []):
+            draft_id = draft.get("id", "")
+            if not draft_id:
+                continue
+            full = service.users().drafts().get(userId="me", id=draft_id, format="full").execute()
+            message = full.get("message", {})
+            from_header = _header_value(message, "from").lower()
+            if SENDER_ADDRESS.lower() not in from_header:
+                continue
+            if target not in _draft_recipient_emails(message):
+                continue
+            if _payload_has_attachment(message.get("payload", {})):
+                continue
+            return draft_id
+
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            return None
+
+
 def create_draft(
     to_email: str,
     subject: str,
     body: str,
     contact_name: str = "",
     company_name: str = "",
+    update_existing: bool = True,
 ) -> Optional[str]:
     """
     Create a Gmail draft in contact@tum-socialaiclub.de.
@@ -72,6 +145,8 @@ def create_draft(
         body: Plain-text email body.
         contact_name: Used for logging only.
         company_name: Used for logging only.
+        update_existing: If True, update an existing matching draft instead
+            of creating a duplicate.
 
     Returns:
         Draft ID string if successful, None on failure.
@@ -85,21 +160,27 @@ def create_draft(
         return None
 
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"{SENDER_DISPLAY} <{SENDER_ADDRESS}>"
-        msg["To"] = to_email
+        raw = _build_raw_message(to_email, subject, body)
+        label = f"{contact_name} @ {company_name}" if contact_name and company_name else (contact_name or to_email)
 
-        msg.attach(MIMEText(body, "plain", "utf-8"))
+        if update_existing:
+            existing_draft_id = find_existing_draft(service, to_email)
+            if existing_draft_id:
+                draft = service.users().drafts().update(
+                    userId="me",
+                    id=existing_draft_id,
+                    body={"id": existing_draft_id, "message": {"raw": raw}},
+                ).execute()
+                draft_id = draft.get("id", existing_draft_id)
+                console.print(f"  [green]Gmail draft updated: {label} → {to_email} (ID: {draft_id[:8]}...)[/green]")
+                return draft_id
 
-        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode("utf-8")
         draft = service.users().drafts().create(
             userId="me",
             body={"message": {"raw": raw}}
         ).execute()
 
         draft_id = draft.get("id", "")
-        label = f"{contact_name} @ {company_name}" if contact_name and company_name else (contact_name or to_email)
         console.print(f"  [green]Gmail draft created: {label} → {to_email} (ID: {draft_id[:8]}...)[/green]")
         return draft_id
 
