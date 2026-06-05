@@ -31,7 +31,7 @@ The system is intentionally no longer a fixed weekly campaign machine. Campaign 
 | `apollo_enrichment_agent` | Adds verified company/contact data before Notion upload. | The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates `apollo_enrichment_batches.json`, merges Apollo connector/session-log or UI export results into `apollo_enriched_contacts_for_review.csv`, flags senior marketing/recruiting/people contacts that still need a real mobile number, and emits `apollo_upload_ready.csv` with only safe import rows. |
 | `upload_agent` | Uploads Apollo CSVs into Notion Accounts and Contacts. | Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended. |
 | `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus processed `data/prompts/outreach_learnings.md`, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in `partnerships@tum-socialaiclub.de` for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
-| `owner_assignment_agent` | Splits campaign ownership by account after drafts exist. | Runs `python scripts/assign_partnership_outreach.py --apply`. It balances the current campaign across Timon, Felix, Till, and Nicolas; future campaigns rotate only across Timon, Felix, and Till. One account has one sender, and every contact under that account gets the same Notion `Contact Owner*`, `Campaign Sender`, and draft sender signature. Gmail labels can be applied after OAuth has label/modify scopes. |
+| `owner_assignment_agent` | Splits campaign ownership by account after drafts exist. | Runs `python scripts/assign_partnership_outreach.py --apply`. It balances the current campaign across Timon, Felix, Till, and Jaron; future campaigns rotate only across Timon, Felix, and Till. One account has one sender, and every contact under that account gets the same Notion `Contact Owner*`, `Campaign Sender`, and draft sender signature. Gmail labels can be applied after OAuth has label/modify scopes. |
 | `linkedin_manager` | Reviews LinkedIn connection/follow-up actions. | Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3-5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard. |
 | `feedback_agent` | Turns outcome data and manual copywriter iterations into prompt learnings. | Reads resolved outcomes, analyzes A/B test results, scans the Notion Iterations page, distills reusable guidance into `data/prompts/outreach_learnings.md`, and moves processed iteration notes into the Processed section. |
 
@@ -145,8 +145,8 @@ Examples:
 
 ```bash
 python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"
-python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Nicolas Paul"
-python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"
+python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Felix Laumann"
+python agent.py copywrite --campaign Workflow_0505 --sender "Felix Laumann"
 ```
 
 The generated messages use:
@@ -162,7 +162,7 @@ After drafts are created, run:
 python scripts/assign_partnership_outreach.py --apply
 ```
 
-For the current 87-message campaign, the script splits ownership across Timon, Felix, Till, and Nicolas as evenly as possible while keeping all contacts from the same account with the same owner. For future strategic partnerships campaigns, use only Timon, Felix, and Till as the owner rotation.
+For the current 87-message campaign, the script splits ownership across Timon, Felix, Till, and Jaron as evenly as possible while keeping all contacts from the same account with the same owner. For future strategic partnerships campaigns, use only Timon, Felix, and Till as the owner rotation.
 
 The ownership rule is strict:
 

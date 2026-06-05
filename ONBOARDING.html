@@ -430,7 +430,7 @@
   <li>Review <code>apollo_enriched_contacts_for_review.csv</code>. Rows blocked with <code>needs_mobile_scrape</code>, <code>missing_enriched_email</code>, <code>no_person_found</code>, or review flags do not go to Notion yet.</li>
   <li>Upload <code>apollo_upload_ready.csv</code> with <code>python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"</code>. Upload always sets Account Type* to <code>Corporate</code>, Contact Status to <code>New</code>, and rejects any contact mobile number that equals the company phone number.</li>
   <li>Run <code>python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code>. The copywriter writes Notion outreach fields and creates Gmail drafts for review.</li>
-  <li>Run <code>python scripts/assign_partnership_outreach.py --apply</code>. The owner split happens by account: current campaign across Timon, Felix, Till, and Nicolas; future strategic partnerships campaigns across Timon, Felix, and Till only.</li>
+  <li>Run <code>python scripts/assign_partnership_outreach.py --apply</code>. The owner split happens by account: current campaign across Timon, Felix, Till, and Jaron; future strategic partnerships campaigns across Timon, Felix, and Till only.</li>
   <li>Post the campaign launch message in <code>#strategic-partnerships</code>, then send manually from each teammate's folder over four days for four senders or three days for three senders.</li>
 </ol>
 
@@ -444,7 +444,7 @@
 <tr><td><code>apollo_enrichment_agent</code></td><td>Adds verified company/contact data before Notion upload.</td><td>The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates <code>apollo_enrichment_batches.json</code>, merges Apollo connector/session-log or UI export results into <code>apollo_enriched_contacts_for_review.csv</code>, flags senior marketing/recruiting/people contacts that still need a real mobile number, and emits <code>apollo_upload_ready.csv</code> with only safe import rows.</td></tr>
 <tr><td><code>upload_agent</code></td><td>Uploads Apollo CSVs into Notion Accounts and Contacts.</td><td>Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended.</td></tr>
 <tr><td><code>copywriter_agent</code></td><td>Generates campaign-specific outreach in Notion <strong>and creates Gmail drafts</strong>.</td><td>Uses the shared outreach skill prompt plus processed <code>data/prompts/outreach_learnings.md</code>, reads unprocessed iterations from the Notion Iterations page and injects them into the prompt, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address. After a successful run it marks the iterations as Processed ✅. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts.</td></tr>
-<tr><td><code>owner_assignment_agent</code></td><td>Splits campaign ownership after drafts exist.</td><td>Runs <code>python scripts/assign_partnership_outreach.py --apply</code>. It balances the current campaign across Timon, Felix, Till, and Nicolas; future campaigns rotate only across Timon, Felix, and Till. One account has one responsible sender, and every contact under that account gets the same Notion <code>Contact Owner*</code>, <code>Campaign Sender</code>, and draft sender signature. Gmail labels can be applied after OAuth has Gmail label/modify scopes.</td></tr>
+<tr><td><code>owner_assignment_agent</code></td><td>Splits campaign ownership after drafts exist.</td><td>Runs <code>python scripts/assign_partnership_outreach.py --apply</code>. It balances the current campaign across Timon, Felix, Till, and Jaron; future campaigns rotate only across Timon, Felix, and Till. One account has one responsible sender, and every contact under that account gets the same Notion <code>Contact Owner*</code>, <code>Campaign Sender</code>, and draft sender signature. Gmail labels can be applied after OAuth has Gmail label/modify scopes.</td></tr>
 <tr><td><code>linkedin_manager</code></td><td>Reviews LinkedIn connection/follow-up actions.</td><td>Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3–5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard.</td></tr>
 <tr><td><code>feedback_agent</code></td><td>Turns outcome data and manual copywriter iterations into prompt learnings.</td><td>Reads resolved outcomes, analyzes A/B test results, scans the Notion Iterations page, distills reusable guidance into <code>data/prompts/outreach_learnings.md</code>, and moves processed iteration notes into the Processed section.</td></tr>
 <tr><td><code>notion_cleanup</code></td><td>Maintains Notion data quality.</td><td>Fills missing domains/account types where possible, supports duplicate review/merge workflows, and keeps Accounts/Contacts usable for deduplication before ranking and upload.</td></tr>
@@ -568,8 +568,8 @@ python agent.py --help</code></pre>
 <h3>Campaign Sender</h3>
 <p>Every campaign needs a sender because the copy should sound like the teammate who will actually send it.</p>
 <pre><code>python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"
-python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Nicolas Paul"
-python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code></pre>
+python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Felix Laumann"
+python agent.py copywrite --campaign Workflow_0505 --sender "Felix Laumann"</code></pre>
 <p>The generated messages use:</p>
 <ul>
   <li>LinkedIn sign-off: <code>Best, {first_name}</code></li>
@@ -579,7 +579,7 @@ python agent.py copywrite --campaign Workflow_0505 --sender "Nicolas Paul"</code
 <h3>Owner Split, Labels, And Manual Sending</h3>
 <p>After drafts are created, run:</p>
 <pre><code>python scripts/assign_partnership_outreach.py --apply</code></pre>
-<p>For the current 87-message campaign, the script splits ownership across Timon, Felix, Till, and Nicolas as evenly as possible while keeping all contacts from the same account with the same owner. For future strategic partnerships campaigns, use only Timon, Felix, and Till as the owner rotation.</p>
+<p>For the current 87-message campaign, the script splits ownership across Timon, Felix, Till, and Jaron as evenly as possible while keeping all contacts from the same account with the same owner. For future strategic partnerships campaigns, use only Timon, Felix, and Till as the owner rotation.</p>
 <p>The ownership rule is strict:</p>
 <ul>
   <li>One account has exactly one responsible sender.</li>

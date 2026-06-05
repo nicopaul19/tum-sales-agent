@@ -21,17 +21,19 @@ console = Console()
 BASE_DIR = Path(__file__).parent.parent
 TOKEN_FILE = BASE_DIR / "gmail_token.json"
 CREDS_FILE = next(BASE_DIR.glob("client_secret_*.json"), None)
-SCOPES = [
+COMPOSE_SCOPES = ["https://www.googleapis.com/auth/gmail.compose"]
+LABEL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.labels",
     "https://www.googleapis.com/auth/gmail.modify",
 ]
+SCOPES = COMPOSE_SCOPES
 
 SENDER_ADDRESS = "partnerships@tum-socialaiclub.de"
 SENDER_DISPLAY = "TUM Social AI Club"
 
 
-def _get_gmail_service():
+def _get_gmail_service(scopes: Optional[list[str]] = None):
     """Return an authenticated Gmail API service, refreshing token if needed."""
     try:
         from google.oauth2.credentials import Credentials
@@ -45,7 +47,8 @@ def _get_gmail_service():
         console.print("[red]gmail_token.json not found. Run setup_gmail_auth.py first.[/red]")
         return None
 
-    creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), SCOPES)
+    requested_scopes = scopes or SCOPES
+    creds = Credentials.from_authorized_user_file(str(TOKEN_FILE), requested_scopes)
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(Request())
