@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.update_ai_for_good_hackathon_drafts import build_body, list_rewrites  # noqa: E402
 from utils.config import DATA_DIR, NOTION_DB_ACCOUNTS_ID, NOTION_DB_CONTACTS_ID  # noqa: E402
-from utils.gmail_client import _build_raw_message, _get_gmail_service  # noqa: E402
+from utils.gmail_client import LABEL_SCOPES, _build_raw_message, _get_gmail_service  # noqa: E402
 from utils.notion_client import _notion_api_headers  # noqa: E402
 
 
@@ -53,10 +53,10 @@ CURRENT_CAMPAIGN_OWNERS = [
         "gmail_label": "Strategic Partnerships/Till",
     },
     {
-        "name": "Nicolas",
-        "full_name": "Nicolas Paul",
+        "name": "Jaron",
+        "full_name": "Team Member",
         "notion_id": "notion-user-uuid",
-        "gmail_label": "Strategic Partnerships/Nicolas",
+        "gmail_label": "Strategic Partnerships/Jaron",
     },
 ]
 
@@ -334,7 +334,7 @@ def main() -> int:
     parser.add_argument("--sleep", type=float, default=0.05, help="Gmail update delay")
     args = parser.parse_args()
 
-    service = _get_gmail_service()
+    service = _get_gmail_service(LABEL_SCOPES if args.labels_only or args.apply_gmail_labels else None)
     if not service:
         raise RuntimeError("Could not initialize Gmail service")
 
