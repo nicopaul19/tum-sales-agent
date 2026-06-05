@@ -24,7 +24,11 @@ except ImportError:
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.compose"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.labels",
+    "https://www.googleapis.com/auth/gmail.modify",
+]
 
 BASE_DIR = Path(__file__).parent
 CREDS_FILE = next(BASE_DIR.glob("client_secret_*.json"), None)
