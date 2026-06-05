@@ -31,12 +31,10 @@ from utils.gmail_client import (  # noqa: E402
 )
 
 
-EVENT_NAME = "AI for Good Hackathon - Africa Edition"
-EVENT_DATE = "June 27-28, 2026"
-EVENT_LOCATION = "TUM Munich"
-REGISTER_DEADLINE = "June 20"
-REGISTER_URL = "https://luma.com/0gsxudfu"
-ORGANIZERS = "NamibAI, TUM Social AI Club, and TUM.ai"
+EVENT_NAME = "AI for Good Hackathon: Africa"
+EVENT_DATE = "June 27-28"
+EVENT_LOCATION = "TU Munich"
+ORGANIZERS = "NamibAI and TUM.ai"
 
 
 @dataclass
@@ -147,10 +145,11 @@ def infer_angle(subject: str, body: str) -> str:
 
 
 def opening_question(company: str, angle: str) -> str:
+    possessive = f"{company}'" if company.lower().endswith("s") else f"{company}'s"
     if angle == "talent":
         return f"are you currently trying to get early access to AI and engineering talent for {company}?"
     if angle == "technical":
-        return f"are you currently trying to get more AI builders to use and test {company}'s tools?"
+        return f"are you currently trying to get more AI builders to use and test {possessive} tools?"
     if angle == "impact":
         return f"are you currently looking for credible AI-for-Good visibility for {company}?"
     if angle == "visibility":
@@ -172,7 +171,7 @@ def angle_sentence(company: str, angle: str) -> str:
     if angle == "impact":
         return (
             f"For {company}, this could be a credible impact opportunity: visibly support AI teams "
-            "building for African non-profits and help winning ideas move into implementation."
+            "building for global non-profits and help winning ideas move into implementation."
         )
     if angle == "visibility":
         return (
@@ -188,11 +187,11 @@ def angle_sentence(company: str, angle: str) -> str:
 def build_body(greeting: str, company: str, angle: str, sender: str) -> str:
     return (
         f"Hi {greeting},\n\n"
-        f"{opening_question(company, angle)} We are hosting the {EVENT_NAME} on {EVENT_DATE} "
-        f"at {EVENT_LOCATION} together with {ORGANIZERS}. It is positioned as Munich's largest "
-        "AI for Good Hackathon, with interdisciplinary students building real AI concepts for "
-        "African non-profits using OpenAI and Lovable tools. Participant registration closes "
-        f"{REGISTER_DEADLINE}: {REGISTER_URL}\n\n"
+        f"{opening_question(company, angle)} As TUM Social AI, we are hosting the \"{EVENT_NAME}\" "
+        f"on {EVENT_DATE} at the {EVENT_LOCATION} together with {ORGANIZERS}. It is positioned "
+        "as Munich's largest AI for Good Hackathon, with interdisciplinary students building real "
+        "AI applications for global non-profits. We're already partnering up with organizations "
+        "like the UN, OpenAI and Lovable.\n\n"
         f"{angle_sentence(company, angle)}\n\n"
         "We are looking for sponsors and tech-stack/API/cloud-credit partners. In return we can offer "
         "keynote-stage visibility, booth presence, exclusive CV access, social media reach inside "
@@ -294,11 +293,11 @@ def audit_rewrite(rewrite: DraftRewrite) -> list[str]:
         EVENT_NAME,
         EVENT_DATE,
         EVENT_LOCATION,
-        "African non-profits",
+        "global non-profits",
+        "real AI applications",
+        "the UN",
         "OpenAI",
         "Lovable",
-        REGISTER_DEADLINE,
-        REGISTER_URL,
         "Would a partner slot be relevant",
     ]
     haystack = f"{rewrite.new_subject}\n{rewrite.body}"

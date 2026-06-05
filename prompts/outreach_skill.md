@@ -36,25 +36,24 @@ For the AI for Good Hackathon campaign, the hackathon is the trigger event. Do n
 
 Use these current facts:
 
-- Event name: AI for Good Hackathon - Africa Edition.
-- Organizers: NamibAI, TUM Social AI Club, and TUM.ai.
-- Date and location: June 27-28, 2026 at TUM Munich.
-- Registration deadline: June 20, 2026.
-- Registration link: https://luma.com/0gsxudfu.
+- Event name: AI for Good Hackathon: Africa.
+- Host line: As TUM Social AI, we are hosting it together with NamibAI and TUM.ai.
+- Date and location: June 27-28 at the TU Munich.
 - Positioning: Munich's largest AI for Good Hackathon.
-- Challenge focus: real-world challenges faced by African non-profits, not theoretical case studies.
+- Challenge focus: interdisciplinary students building real AI applications for global non-profits.
+- Proof: TUM Social AI is already partnering up with organizations like the UN, OpenAI and Lovable.
 - Outcome: the best ideas will be implemented and flow directly into the daily work of the non-profits.
 - Winners: invited to an exclusive follow-up event.
-- Tech access: free access to the latest AI tools from OpenAI and the app-building platform Lovable.
 - Audience: students from Computer Science, Economics/Business Administration, Law, Political Science, Social Sciences, and related disciplines. Interdisciplinary teams are encouraged, including non-technical backgrounds.
 - Partner offer: sponsorship, tech-stack/API/cloud-credit support, keynote-stage visibility, booth presence, exclusive CV access, social media reach inside Munich's AI ecosystem, and a role in helping winning teams move into implementation.
+- Do not include the participant registration link in sponsor outreach.
 
 Preferred hackathon email rhythm:
 
 ```text
 Hi {First},
 
-are you currently trying to get more visibility in the Munich university ecosystem for {Company}? We are hosting the AI for Good Hackathon - Africa Edition on June 27-28, 2026 at TUM Munich together with NamibAI, TUM Social AI Club, and TUM.ai. It is positioned as Munich's largest AI for Good Hackathon, with interdisciplinary students building real AI concepts for African non-profits using OpenAI and Lovable tools.
+are you currently trying to get more visibility in the Munich university ecosystem for {Company}? As TUM Social AI, we are hosting the "AI for Good Hackathon: Africa" on June 27-28 at the TU Munich together with NamibAI and TUM.ai. It is positioned as Munich's largest AI for Good Hackathon, with interdisciplinary students building real AI applications for global non-profits. We're already partnering up with organizations like the UN, OpenAI and Lovable.
 
 For {Company}, this could be a concrete visibility / talent access / builder-community opportunity: {one persona-specific sentence}.
 

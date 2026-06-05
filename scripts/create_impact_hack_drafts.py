@@ -1,5 +1,5 @@
 """
-Create AI for Good Hackathon - Africa Edition outreach drafts for selected Notion contacts.
+Create AI for Good Hackathon: Africa outreach drafts for selected Notion contacts.
 
 Scope:
 - Contacts linked to accounts in the configured target campaigns.
@@ -59,24 +59,23 @@ ALLOWED_ACCOUNT_STATUSES = {
 }
 
 EVENT_FACTS = """
-AI for Good Hackathon - Africa Edition takes place on June 27-28, 2026 at TUM Munich.
-It is organized by NamibAI, TUM Social AI Club, and TUM.ai.
-Participant registration is open until June 20, 2026 at https://luma.com/0gsxudfu.
+AI for Good Hackathon: Africa takes place on June 27-28, 2026 at TU Munich.
+It is hosted by TUM Social AI together with NamibAI and TUM.ai.
 The event is positioned as Munich's largest AI for Good Hackathon.
-Students will work on real-world challenges faced by African non-profits, not theoretical case studies.
+Interdisciplinary students will build real AI applications for global non-profits, not theoretical case studies.
+TUM Social AI is already partnering up with organizations like the UN, OpenAI, and Lovable.
 The best ideas will be implemented and flow directly into the daily work of the non-profits.
 Winners will be invited to an exclusive follow-up event.
-Participants get exclusive free access to the latest AI tools from OpenAI and the app-building platform Lovable.
 The audience includes students from Computer Science, Economics/Business Administration, Law, Political Science, Social Sciences, and related disciplines.
 Interdisciplinary teams are encouraged, including students from non-technical backgrounds.
 Partner opportunities include sponsorship, tech-stack/API/cloud-credit support, keynote-stage visibility, booth presence, exclusive CV access, social media reach inside Munich's AI ecosystem, and a concrete role in helping winning teams move into implementation.
 """.strip()
 
 HACKATHON_TRIGGER = (
-    "AI for Good Hackathon - Africa Edition on June 27-28, 2026 at TUM Munich, "
-    "organized by NamibAI, TUM Social AI Club, and TUM.ai. Students will build "
-    "real AI concepts for African non-profits with OpenAI and Lovable access; "
-    "the best ideas will be implemented into the non-profits' daily work."
+    "AI for Good Hackathon: Africa on June 27-28, 2026 at TU Munich, hosted "
+    "by TUM Social AI together with NamibAI and TUM.ai. Interdisciplinary "
+    "students will build real AI applications for global non-profits, with "
+    "TUM Social AI already partnering up with organizations like the UN, OpenAI, and Lovable."
 )
 
 
@@ -363,7 +362,7 @@ def persona_hint(job_title: str, campaigns: Iterable[str]) -> str:
     if any(term in title for term in ["brand", "marketing", "communication", "community", "events"]):
         return "Brand/marketing: emphasize keynote stage, booth, social media, and campus ecosystem visibility."
     if any(term in title for term in ["sustain", "csr", "impact", "esg"]):
-        return "Impact/CSR: emphasize AI-for-Good, African nonprofit challenges, and measurable social-impact visibility."
+        return "Impact/CSR: emphasize AI-for-Good, global non-profit applications, and measurable social-impact visibility."
     if any(term in title for term in ["engineer", "product", "developer", "cto", "technical"]):
         return "Product/engineering: emphasize OpenAI/Lovable tooling, challenge track/workshop, and AI builders as power users."
     if any(term in title for term in ["founder", "ceo", "coo", "cmo", "chief", "partner", "business development", "bd"]):
@@ -421,7 +420,7 @@ def template_angle(record: ContactRecord) -> str:
     if any(term in title for term in ["sustain", "csr", "impact", "esg"]):
         return (
             f"For {company}, this could be a strong CSR and impact play: visible support for "
-            "AI-for-Good and student teams tackling real challenges for African non-profits."
+            "AI-for-Good and student teams building real AI applications for global non-profits."
         )
     if any(term in title for term in ["engineer", "product", "developer", "cto", "technical"]):
         return (
@@ -451,10 +450,10 @@ def generate_template_email(record: ContactRecord, sender: str = "") -> EmailDra
     body = (
         f"Hi {greeting},\n\n"
         f"are you currently trying to get more visibility in the Munich university ecosystem for {company}? "
-        "We are hosting the AI for Good Hackathon - Africa Edition on June 27-28, 2026 at TUM Munich "
-        "together with NamibAI and TUM.ai. It is positioned as Munich's largest AI for Good Hackathon, "
-        "with interdisciplinary students building real AI concepts for African non-profits using OpenAI "
-        "and Lovable tools. Participant registration closes June 20: https://luma.com/0gsxudfu\n\n"
+        "As TUM Social AI, we are hosting the \"AI for Good Hackathon: Africa\" on June 27-28 "
+        "at the TU Munich together with NamibAI and TUM.ai. It is positioned as Munich's largest "
+        "AI for Good Hackathon, with interdisciplinary students building real AI applications for "
+        "global non-profits. We're already partnering up with organizations like the UN, OpenAI and Lovable.\n\n"
         f"{template_angle(record)}\n\n"
         "We are looking for sponsors and tech-stack/API/cloud-credit partners. In return we can offer "
         "keynote-stage visibility, booth presence, exclusive CV access, social media reach inside "
@@ -521,9 +520,9 @@ RULES:
 - Body max 170 words including greeting and sign-off.
 - Start with "Hi {greeting},".
 - Keep it lean, concrete, and excited.
-- Use namedropping naturally: TUM Munich, TUM.ai, TUM Social AI Club, OpenAI, Lovable, NamibAI, African non-profits, interdisciplinary students.
+- Use namedropping naturally: TU Munich, TUM.ai, TUM Social AI, NamibAI, the UN, OpenAI, Lovable, global non-profits, interdisciplinary students.
 - Use the hackathon as the trigger event. Do not fall back to the generic corporate proof line unless it supports the event-specific ask.
-- Mention the June 27-28, 2026 date and the June 20 registration deadline when it fits naturally.
+- Mention the June 27-28 date. Do not include the participant registration link in sponsor outreach.
 - Include at least one company/persona-specific sentence.
 - CTA should ask whether partnering, sponsoring, or taking a concrete event role is relevant for their team.
 - No emojis. No em dash or en dash. No placeholders. Do not invent company facts.
@@ -697,7 +696,7 @@ def show_summary(records: list[ContactRecord], audit_path: Path) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create AI for Good Hackathon - Africa Edition outreach drafts")
+    parser = argparse.ArgumentParser(description="Create AI for Good Hackathon: Africa outreach drafts")
     parser.add_argument("--dry-run", action="store_true", help="Generate only, do not write to Notion or Gmail")
     parser.add_argument("--limit", type=int, default=0, help="Limit records for testing")
     parser.add_argument("--sender", default="", help="Optional override sender for every draft")
