@@ -21,7 +21,11 @@ console = Console()
 BASE_DIR = Path(__file__).parent.parent
 TOKEN_FILE = BASE_DIR / "gmail_token.json"
 CREDS_FILE = next(BASE_DIR.glob("client_secret_*.json"), None)
-SCOPES = ["https://www.googleapis.com/auth/gmail.compose"]
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.labels",
+    "https://www.googleapis.com/auth/gmail.modify",
+]
 
 SENDER_ADDRESS = "partnerships@tum-socialaiclub.de"
 SENDER_DISPLAY = "TUM Social AI Club"
