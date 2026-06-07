@@ -43,6 +43,7 @@ from utils.notion_client import (
 )
 from utils.preflight import run_preflight
 from utils.gmail_client import create_draft as gmail_create_draft
+from utils.copywriting_guidance import load_humanized_guidance
 
 console = Console()
 
@@ -209,6 +210,19 @@ BANNED_CUSTOMER_COPY_TERMS = [
     "mutual engagement",
     "i tried connecting",
     "interesting",
+    "at its core",
+    "the real question",
+    "stands as",
+    "serves as",
+    "boasts",
+    "showcasing",
+    "underscoring",
+    "highlighting",
+    "fostering",
+    "pivotal",
+    "crucial",
+    "groundbreaking",
+    "gamechanger",
 ]
 
 
@@ -229,9 +243,13 @@ def validate_outreach(messages: OutreachMessages, include_linkedin: bool = False
 
     for field, text in fields.items():
         lowered = (text or "").lower()
+        if "—" in text or "–" in text or " -- " in text:
+            issues.append(f"{field} contains an em/en dash or double-hyphen aside")
         for term in BANNED_CUSTOMER_COPY_TERMS:
             if term in lowered:
                 issues.append(f"{field} contains banned phrase: {term}")
+        if "not just" in lowered and " but " in lowered:
+            issues.append(f"{field} uses formulaic 'not just X but Y' structure")
 
     subject = messages.cold_email_subject or ""
     subject_lower = subject.lower()
@@ -593,6 +611,7 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
     learnings = load_learnings_prompt()
     if learnings:
         full_system_prompt += learnings
+    full_system_prompt += load_humanized_guidance("Strategic Partnerships")
 
     last_result = None
     last_usage = None
@@ -619,7 +638,7 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
             )
         last_result = result
         last_usage = response.usage
-        issues = validate_outreach(result)
+        issues = validate_outreach(result, include_linkedin=True)
         if not issues:
             break
         quality_feedback = (
@@ -645,7 +664,7 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
         }
     )
 
-    final_issues = validate_outreach(result)
+    final_issues = validate_outreach(result, include_linkedin=True)
     if final_issues:
         raise ValueError("Generated copy failed quality gate: " + "; ".join(final_issues))
 
@@ -694,6 +713,7 @@ def run_copywriter(
     skill_prompt = load_skill_prompt()
     if not skill_prompt:
         return
+    console.print("[cyan]Humanizer + strategic Notion best-practice guidance enabled[/cyan]")
 
     # Check for learnings file
     if LEARNINGS_PATH.exists():
