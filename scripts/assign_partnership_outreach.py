@@ -204,6 +204,20 @@ def build_assignment_rows(rewrites: list, owner_by_company: dict[str, dict]) -> 
     return rows
 
 
+def load_recipient_filter(path: str) -> set[str]:
+    """Load allowed recipient emails from a CSV with an Email column."""
+    if not path:
+        return set()
+    allowed: set[str] = set()
+    with Path(path).expanduser().open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            email = (row.get("Email") or row.get("email") or "").strip().lower()
+            if email and "@" in email:
+                allowed.add(email)
+    return allowed
+
+
 def write_report(rows: list[dict], apply: bool) -> Path:
     path = DATA_DIR / "reports" / f"partnership_outreach_owner_assignments_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{'live' if apply else 'dry_run'}.csv"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -331,6 +345,7 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="Apply Gmail draft and Notion updates")
     parser.add_argument("--apply-gmail-labels", action="store_true", help="Also apply Gmail labels if token has label scopes")
     parser.add_argument("--labels-only", action="store_true", help="Only apply Gmail labels after OAuth has label scopes")
+    parser.add_argument("--recipient-csv", default="", help="Only process drafts whose recipient email appears in this CSV's Email column")
     parser.add_argument("--sleep", type=float, default=0.05, help="Gmail update delay")
     args = parser.parse_args()
 
@@ -339,6 +354,12 @@ def main() -> int:
         raise RuntimeError("Could not initialize Gmail service")
 
     rewrites = list_rewrites(service)
+    allowed_recipients = load_recipient_filter(args.recipient_csv)
+    if allowed_recipients:
+        rewrites = [
+            rewrite for rewrite in rewrites
+            if parseaddr(rewrite.to_header or "")[1].strip().lower() in allowed_recipients
+        ]
     owner_by_company = assign_by_account(rewrites, CURRENT_CAMPAIGN_OWNERS)
     rows = build_assignment_rows(rewrites, owner_by_company)
     report = write_report(rows, args.apply)

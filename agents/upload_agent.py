@@ -51,6 +51,7 @@ from utils.notion_client import (
     update_account_in_notion,
 )
 from utils.preflight import run_preflight
+from utils.campaign_tracker import sync_campaign_tracker
 
 console = Console()
 
@@ -641,6 +642,10 @@ def run_upload(csv_path: str, sender: str = "", dry_run: bool = False, interacti
     summary.add_row("Campaign ID", campaign_id)
     summary.add_row("Campaign sender", campaign_sender)
     console.print(summary)
+
+    if not dry_run:
+        console.print("\n[cyan]Syncing Campaign Tracker after upload...[/cyan]")
+        sync_campaign_tracker(campaign_id=campaign_id)
 
 
 if __name__ == "__main__":

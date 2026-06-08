@@ -28,12 +28,19 @@ The system is intentionally no longer a fixed weekly campaign machine. Campaign 
 | `collector` | Aggregates lead signals into `data/tables/master_input.csv`. | Uses three input streams: LinkedIn screenshots in `data/inputs/images/`, LinkedIn post URLs in `data/inputs/linkedin_urls/`, and manual contact CSVs/notes in `data/inputs/manual_contacts/`. GPT-4o Vision extracts company/person/context from screenshots. LinkedIn URL processing extracts entities, domains, roles, and the specific trigger event. Deduplication uses normalized domain + person name, LinkedIn profile URLs, and a per-company cap so the master table stays campaign-safe. |
 | `ranking_agent` | Creates the on-demand top leads report. | Uses GPT-4o structured scoring from 0-10. The strongest fit is a company similar to proven pipeline successes, with positive social/ecological impact, AI or AI-talent relevance, and evidence of engaging with student organizations in Germany. DACH presence is only a tiebreaker, not a hard requirement. Leads with score >= 5 qualify for the shortlist. |
 | `ranking_agent` filters | Prevents obvious bad leads from entering campaigns. | Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized. |
-| `apollo_enrichment_agent` | Adds verified company/contact data before Notion upload. | The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates `apollo_enrichment_batches.json`, merges Apollo connector/session-log or UI export results into `apollo_enriched_contacts_for_review.csv`, flags senior marketing/recruiting/people contacts that still need a real mobile number, and emits `apollo_upload_ready.csv` with only safe import rows. |
+| `apollo_enrichment_agent` | Adds verified company/contact data before Notion upload. | The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates `apollo_enrichment_batches.json`, merges Apollo connector/session-log or UI export results into `apollo_enriched_contacts_for_review.csv`, flags senior marketing/recruiting/people, partnerships/BD, campus/university relations, ecosystem, and community contacts that still need a real mobile number, and emits `apollo_upload_ready.csv` with only safe import rows. |
 | `upload_agent` | Uploads Apollo CSVs into Notion Accounts and Contacts. | Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended. |
-| `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus processed `data/prompts/outreach_learnings.md`, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in `partnerships@tum-socialaiclub.de` for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
+| `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus Campaign Tracker history, processed `data/prompts/outreach_learnings.md`, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It always assigns A/B Variant A or B, writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion, and automatically creates a Gmail draft in `partnerships@tum-socialaiclub.de` for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
+| `campaign_tracker` | Maintains the Notion Campaign Tracker database. | Extracts every `Campaign ID` from Accounts, relates campaign pages only to Accounts, and records campaign trigger, target audience, targeting reasoning, outreach summary, contact engagement counts, and A/B winner. Upload, copywriter, NGO email writer, and feedback runs sync it automatically; `python agent.py campaigns` backfills or repairs it manually. |
 | `owner_assignment_agent` | Splits campaign ownership by account after drafts exist. | Runs `python scripts/assign_partnership_outreach.py --apply`. It balances the current campaign across Timon, Felix, Till, and Jaron; future campaigns rotate only across Timon, Felix, and Till. One account has one sender, and every contact under that account gets the same Notion `Contact Owner*`, `Campaign Sender`, and draft sender signature. Gmail labels can be applied after OAuth has label/modify scopes. |
 | `linkedin_manager` | Reviews LinkedIn connection/follow-up actions. | Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3-5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard. |
-| `feedback_agent` | Turns outcome data and manual copywriter iterations into prompt learnings. | Reads resolved outcomes, analyzes A/B test results, scans the Notion Iterations page, distills reusable guidance into `data/prompts/outreach_learnings.md`, and moves processed iteration notes into the Processed section. |
+| `feedback_agent` | Turns outcome data and manual copywriter iterations into prompt learnings. | Reads resolved outcomes, analyzes A/B test results, syncs the Campaign Tracker, scans the Notion Iterations page, distills reusable guidance into `data/prompts/outreach_learnings.md`, and moves processed iteration notes into the Processed section. |
+
+### Campaign Tracker Rule
+
+`Campaign ID` in the Accounts database is not enough. Every strategic partnership campaign must also create or update one entry in the shared Campaign Tracker database and relate that entry back to all targeted Accounts. The entry must capture the campaign trigger, target audience, targeting reasoning, outreach summary, and the A/B/performance fields that the feedback agent will update later.
+
+The normal upload, copywriter, NGO email writer, and feedback flows sync this automatically. If a teammate changes campaign membership manually in Notion, run `python agent.py campaigns` afterwards so the Campaign Tracker and Accounts database stay aligned.
 
 ### Strategic Ranking Criteria Details
 
@@ -99,6 +106,7 @@ OPENAI_API_KEY=
 NOTION_TOKEN=
 NOTION_DB_ACCOUNTS_ID=
 NOTION_DB_CONTACTS_ID=
+NOTION_DB_CAMPAIGNS_ID=
 GMAIL_ADDRESS=
 GMAIL_APP_PASSWORD=
 REPORT_RECIPIENT_EMAIL=
@@ -131,6 +139,7 @@ Use `agent.py` for all environments. It works in Codex, Claude Code, Antigravity
 | Prepare Apollo enrichment review | After ranking / Apollo connector enrichment | `python agent.py apollo-enrich --mcp-json "/path/to/session.jsonl"` |
 | Upload Apollo-ready CSV | After reviewing `apollo_enriched_contacts_for_review.csv` | `python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"` |
 | Generate outreach | After upload | `python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"` |
+| Sync Campaign Tracker | After manual CRM edits or when checking history | `python agent.py campaigns` |
 | Assign owners and sender folders | After drafts exist | `python scripts/assign_partnership_outreach.py --apply` |
 | LinkedIn review | After saving LinkedIn network HTML | `python agent.py linkedin --connections-file "/path/to/network.html"` |
 | Infrastructure audit | On request | `python agent.py supervisor` |
@@ -193,7 +202,7 @@ Put these as recurring calendar blockers, but execute campaign actions only when
 | After Apollo | Upload + copywriter | Run upload with `--sender`, then copywrite for the campaign. |
 | Campaign launch | Owner split + Slack launch note | Assign owners, post the launch message in `#strategic-partnerships`, and split sending over four days for four senders or three days for three senders. Keep the team at 20-30 sent outreach emails per day total to protect deliverability. |
 | 1x per week during active campaign | LinkedIn follow-up review | Save the LinkedIn connections page and run `python agent.py linkedin --connections-file ...`. |
-| After outcomes accumulate | Copywriter feedback | Add examples to the Notion improvement log; run `python agent.py feedback` when there is enough data. |
+| After outcomes accumulate | Copywriter feedback | Add examples to the Notion improvement log; run `python agent.py feedback` when there is enough data. This also updates Campaign Tracker performance and A/B results. |
 
 Recommended calendar blocks:
 
@@ -211,7 +220,7 @@ Recommended calendar blocks:
 | `com.tumsocialai.project-applications` | Monday 09:30 | Processes project application intake. |
 | `com.tumsocialai.requirements-enrichment` | Monday 07:00 + 12:00 | Enriches requirements/applications. |
 | `com.tumsocialai.notion-cleanup` | Monday 10:00 + 15:00 | Fills missing domains/account types automatically; duplicate merges remain manual. |
-| `com.tumsocialai.feedback-agent` | Monday 11:00 + 16:00 | Analyzes outreach outcomes, A/B results, and Notion copywriter iterations. |
+| `com.tumsocialai.feedback-agent` | Monday 11:00 + 16:00 | Analyzes outreach outcomes, A/B results, and Notion copywriter iterations, then syncs Campaign Tracker performance fields. |
 
 Campaign/action jobs that run on demand:
 
@@ -221,7 +230,7 @@ Campaign/action jobs that run on demand:
 | `com.tumsocialai.linkedin-manager` | Manual (`python agent.py linkedin ...`) |
 | `com.tumsocialai.sales-supervisor` | Manual (`python agent.py supervisor`) |
 | `com.tumsocialai.enrichment` | Manual |
-| `com.tumsocialai.copywriter` | Manual (`python agent.py copywrite --campaign ... --sender ...`) |
+| `com.tumsocialai.copywriter` | Manual (`python agent.py copywrite --campaign ... --sender ...`); reads Campaign Tracker context, assigns A/B variants, writes drafts, and syncs Campaign Tracker. |
 
 On macOS, Quick Actions are optional convenience tools. They are not required for teammates using Codex, Claude Code, Antigravity, or Windows.
 
@@ -262,9 +271,10 @@ The weekly feedback agent (`com.tumsocialai.feedback-agent`) owns the copywriter
 
 1. Reads unprocessed iterations from the [Notion Iterations page](https://www.notion.so/Iterations-on-Strategic-Partnersh-Copywriter-Agent-366a0c6e616880f8ba37ffa95d90b2fa)
 2. Combines them with outreach outcome data and A/B test statistics
-3. Writes consolidated guidance to `data/prompts/outreach_learnings.md`
-4. Moves processed iterations into the **Processed ✅** toggle on the Notion page
-5. The copywriter agent consumes `outreach_learnings.md` on its next on-demand campaign run
+3. Updates the Campaign Tracker so each campaign shows engaged/not-engaged contacts and the current A/B winner
+4. Writes consolidated guidance to `data/prompts/outreach_learnings.md`
+5. Moves processed iterations into the **Processed ✅** toggle on the Notion page
+6. The copywriter agents consume Campaign Tracker context and `outreach_learnings.md` on the next on-demand campaign run
 
 ### Adding a New Iteration (When You Flag a Bad Draft)
 

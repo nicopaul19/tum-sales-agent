@@ -107,7 +107,9 @@ MARKETING_OR_RECRUITING_RE = re.compile(
     r"\b("
     r"marketing|growth|brand|communications?|demand generation|demand gen|"
     r"recruit(?:ing|ment)?|talent acquisition|talent|people|people\s*&\s*culture|"
-    r"human resources|hr|employer brand(?:ing)?|staffing"
+    r"human resources|hr|employer brand(?:ing)?|staffing|"
+    r"partnerships?|business development|bizdev|bd|alliances?|"
+    r"campus relations?|university relations?|ecosystem|community"
     r")\b",
     re.IGNORECASE,
 )
@@ -175,7 +177,7 @@ def split_name(name: str) -> Tuple[str, str]:
 
 
 def senior_marketing_or_recruiting_title(title: str) -> bool:
-    """True when a title is senior and sits in marketing/recruiting/people."""
+    """True when a title is senior and sits in a strong outreach persona area."""
     title = clean_value(title)
     if not title:
         return False

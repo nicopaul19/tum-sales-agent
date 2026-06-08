@@ -441,12 +441,13 @@
 <tr><td><code>collector</code></td><td>Aggregates lead signals into <code>data/tables/master_input.csv</code>.</td><td>Uses three input streams: LinkedIn screenshots in <code>data/inputs/images/</code>, LinkedIn post URLs in <code>data/inputs/linkedin_urls/</code>, and manual contact CSVs/notes in <code>data/inputs/manual_contacts/</code>. GPT-4o Vision extracts company/person/context from screenshots. LinkedIn URL processing extracts entities, domains, roles, and the specific trigger event. Deduplication uses normalized domain + person name, LinkedIn profile URLs, and a per-company cap so the master table stays campaign-safe.</td></tr>
 <tr><td><code>ranking_agent</code></td><td>Creates the on-demand top leads report.</td><td>Uses GPT-4o structured scoring from 0–10. The strongest fit is a company similar to proven pipeline successes, with positive social/ecological impact, AI or AI-talent relevance, and evidence of engaging with student organizations in Germany. DACH presence is only a tiebreaker, not a hard requirement. Leads with score ≥ 5 qualify for the shortlist.</td></tr>
 <tr><td><code>ranking_agent</code> filters</td><td>Prevents obvious bad leads from entering campaigns.</td><td>Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized.</td></tr>
-<tr><td><code>apollo_enrichment_agent</code></td><td>Adds verified company/contact data before Notion upload.</td><td>The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates <code>apollo_enrichment_batches.json</code>, merges Apollo connector/session-log or UI export results into <code>apollo_enriched_contacts_for_review.csv</code>, flags senior marketing/recruiting/people contacts that still need a real mobile number, and emits <code>apollo_upload_ready.csv</code> with only safe import rows.</td></tr>
+<tr><td><code>apollo_enrichment_agent</code></td><td>Adds verified company/contact data before Notion upload.</td><td>The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates <code>apollo_enrichment_batches.json</code>, merges Apollo connector/session-log or UI export results into <code>apollo_enriched_contacts_for_review.csv</code>, flags senior marketing/recruiting/people, partnerships/BD, campus/university relations, ecosystem, and community contacts that still need a real mobile number, and emits <code>apollo_upload_ready.csv</code> with only safe import rows.</td></tr>
 <tr><td><code>upload_agent</code></td><td>Uploads Apollo CSVs into Notion Accounts and Contacts.</td><td>Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended.</td></tr>
-<tr><td><code>copywriter_agent</code></td><td>Generates campaign-specific outreach in Notion <strong>and creates Gmail drafts</strong>.</td><td>Uses the shared outreach skill prompt plus processed <code>data/prompts/outreach_learnings.md</code>, reads unprocessed iterations from the Notion Iterations page and injects them into the prompt, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion — and automatically creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address. After a successful run it marks the iterations as Processed ✅. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts.</td></tr>
+<tr><td><code>copywriter_agent</code></td><td>Generates campaign-specific outreach in Notion <strong>and creates Gmail drafts</strong>.</td><td>Uses the shared outreach skill prompt plus Campaign Tracker history, processed <code>data/prompts/outreach_learnings.md</code>, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It always assigns A/B Variant A or B, writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion, and automatically creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts.</td></tr>
+<tr><td><code>campaign_tracker</code></td><td>Maintains the Notion Campaign Tracker database.</td><td>Extracts every <code>Campaign ID</code> from Accounts, relates campaign pages only to Accounts, and records campaign trigger, target audience, targeting reasoning, outreach summary, contact engagement counts, and A/B winner. Upload, copywriter, NGO email writer, and feedback runs sync it automatically; <code>python agent.py campaigns</code> backfills or repairs it manually.</td></tr>
 <tr><td><code>owner_assignment_agent</code></td><td>Splits campaign ownership after drafts exist.</td><td>Runs <code>python scripts/assign_partnership_outreach.py --apply</code>. It balances the current campaign across Timon, Felix, Till, and Jaron; future campaigns rotate only across Timon, Felix, and Till. One account has one responsible sender, and every contact under that account gets the same Notion <code>Contact Owner*</code>, <code>Campaign Sender</code>, and draft sender signature. Gmail labels can be applied after OAuth has Gmail label/modify scopes.</td></tr>
 <tr><td><code>linkedin_manager</code></td><td>Reviews LinkedIn connection/follow-up actions.</td><td>Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3–5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard.</td></tr>
-<tr><td><code>feedback_agent</code></td><td>Turns outcome data and manual copywriter iterations into prompt learnings.</td><td>Reads resolved outcomes, analyzes A/B test results, scans the Notion Iterations page, distills reusable guidance into <code>data/prompts/outreach_learnings.md</code>, and moves processed iteration notes into the Processed section.</td></tr>
+<tr><td><code>feedback_agent</code></td><td>Turns outcome data and manual copywriter iterations into prompt learnings.</td><td>Reads resolved outcomes, analyzes A/B test results, syncs the Campaign Tracker, scans the Notion Iterations page, distills reusable guidance into <code>data/prompts/outreach_learnings.md</code>, and moves processed iteration notes into the Processed section.</td></tr>
 <tr><td><code>notion_cleanup</code></td><td>Maintains Notion data quality.</td><td>Fills missing domains/account types where possible, supports duplicate review/merge workflows, and keeps Accounts/Contacts usable for deduplication before ranking and upload.</td></tr>
 <tr><td><code>company_phone_enrichment_agent</code></td><td>Fills missing company phone numbers.</td><td>Runs through <code>python agent.py phone-enrich</code>. It scans official websites and contact/legal pages, validates likely company phone numbers, and writes safe updates to Notion Accounts.</td></tr>
 <tr><td><code>supervisor</code></td><td>Creates infrastructure audits.</td><td>Checks file integrity, API usage, pipeline counts, intake health, and campaign analytics. Use it when something feels off or before handing the system to another teammate.</td></tr>
@@ -459,6 +460,10 @@
 <tr><td><code>create_impact_hack_drafts.py</code></td><td>Specialized Impact Hack outreach script.</td><td>Creates Notion email copy and Gmail drafts for selected existing contacts in Impact Hack 2026 partner campaigns. Run directly from <code>scripts/</code> when that campaign is active.</td></tr>
 </tbody>
 </table>
+
+<h3>Campaign Tracker Rule</h3>
+<p><code>Campaign ID</code> in the Accounts database is not enough. Every strategic partnership campaign must also create or update one entry in the shared Campaign Tracker database and relate that entry back to all targeted Accounts. The entry must capture the campaign trigger, target audience, targeting reasoning, outreach summary, and the A/B/performance fields that the feedback agent will update later.</p>
+<p>The normal upload, copywriter, NGO email writer, and feedback flows sync this automatically. If a teammate changes campaign membership manually in Notion, run <code>python agent.py campaigns</code> afterwards so the Campaign Tracker and Accounts database stay aligned.</p>
 
 <h3>Strategic Ranking Criteria Details</h3>
 <table>
@@ -518,6 +523,7 @@ copy .env.template .env</code></pre>
 NOTION_TOKEN=
 NOTION_DB_ACCOUNTS_ID=
 NOTION_DB_CONTACTS_ID=
+NOTION_DB_CAMPAIGNS_ID=
 GMAIL_ADDRESS=
 GMAIL_APP_PASSWORD=
 REPORT_RECIPIENT_EMAIL=
@@ -543,6 +549,7 @@ python agent.py --help</code></pre>
 <tr><td>Prepare Apollo enrichment review</td><td>After ranking / Apollo connector enrichment</td><td><code>python agent.py apollo-enrich --mcp-json "/path/to/session.jsonl"</code></td></tr>
 <tr><td>Upload Apollo-ready CSV</td><td>After reviewing <code>apollo_enriched_contacts_for_review.csv</code></td><td><code>python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"</code></td></tr>
 <tr><td>Generate outreach</td><td>After upload</td><td><code>python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"</code></td></tr>
+<tr><td>Sync Campaign Tracker</td><td>After manual CRM edits or when checking history</td><td><code>python agent.py campaigns</code></td></tr>
 <tr><td>Assign owners and sender folders</td><td>After drafts exist</td><td><code>python scripts/assign_partnership_outreach.py --apply</code></td></tr>
 <tr><td>LinkedIn review</td><td>After saving LinkedIn network HTML</td><td><code>python agent.py linkedin --connections-file "/path/to/network.html"</code></td></tr>
 <tr><td>Infrastructure audit</td><td>On request</td><td><code>python agent.py supervisor</code></td></tr>
@@ -627,8 +634,8 @@ python scripts/assign_partnership_outreach.py --labels-only</code></pre>
 <tr><td><code>com.tumsocialai.project-applications</code></td><td>Monday 09:30</td><td>Processes project application intake.</td></tr>
 <tr><td><code>com.tumsocialai.requirements-enrichment</code></td><td>Monday 07:00 + 12:00</td><td>Enriches requirements/applications.</td></tr>
 <tr><td><code>com.tumsocialai.notion-cleanup</code></td><td>Monday 10:00 + 15:00</td><td>Fills missing domains/account types automatically; duplicate merges remain manual.</td></tr>
-<tr><td><code>com.tumsocialai.copywriter</code></td><td>Monday 09:10</td><td>Runs copywriter_agent: reads Notion iterations, generates outreach, creates Gmail drafts, marks iterations Processed ✅.</td></tr>
-<tr><td><code>com.tumsocialai.feedback-agent</code></td><td>Monday 11:00 + 16:00</td><td>Analyzes outreach outcomes, A/B results, and Notion copywriter iterations.</td></tr>
+<tr><td><code>com.tumsocialai.copywriter</code></td><td>Monday 09:10</td><td>Runs copywriter_agent: reads Campaign Tracker context, assigns A/B variants, generates outreach, creates Gmail drafts, and syncs Campaign Tracker.</td></tr>
+<tr><td><code>com.tumsocialai.feedback-agent</code></td><td>Monday 11:00 + 16:00</td><td>Analyzes outreach outcomes, A/B results, and Notion copywriter iterations, then syncs Campaign Tracker performance fields.</td></tr>
 </tbody>
 </table>
 
@@ -640,7 +647,7 @@ python scripts/assign_partnership_outreach.py --labels-only</code></pre>
 <tr><td><code>com.tumsocialai.linkedin-manager</code></td><td>Manual (<code>python agent.py linkedin ...</code>)</td></tr>
 <tr><td><code>com.tumsocialai.sales-supervisor</code></td><td>Manual (<code>python agent.py supervisor</code>)</td></tr>
 <tr><td><code>com.tumsocialai.enrichment</code></td><td>Manual</td></tr>
-<tr><td><code>com.tumsocialai.copywriter</code></td><td>Manual (<code>python agent.py copywrite --campaign ... --sender ...</code>)</td></tr>
+<tr><td><code>com.tumsocialai.copywriter</code></td><td>Manual (<code>python agent.py copywrite --campaign ... --sender ...</code>); reads Campaign Tracker context, assigns A/B variants, writes drafts, and syncs Campaign Tracker.</td></tr>
 <tr><td><code>company_phone_enrichment_agent</code></td><td>Manual (<code>python agent.py phone-enrich</code>)</td></tr>
 <tr><td><code>ngo_* agents</code></td><td>Manual, specialized NGO invoice-management campaigns</td></tr>
 <tr><td><code>create_impact_hack_drafts.py</code></td><td>Manual, specialized Impact Hack campaigns</td></tr>
@@ -685,7 +692,7 @@ python scripts/assign_partnership_outreach.py --labels-only</code></pre>
   <li>Creates a Gmail draft in <code>partnerships@tum-socialaiclub.de</code> for every contact with an email address</li>
   <li>Marks the consumed iterations as <strong>Processed ✅</strong> in Notion automatically</li>
 </ol>
-<p>The weekly feedback agent (<code>com.tumsocialai.feedback-agent</code>, Mon 11:00 + 16:00) also reads outcome data and A/B test statistics and writes consolidated guidance to <code>data/prompts/outreach_learnings.md</code>, which the copywriter agent consumes on its next run.</p>
+<p>The weekly feedback agent (<code>com.tumsocialai.feedback-agent</code>, Mon 11:00 + 16:00) also reads outcome data and A/B test statistics, updates Campaign Tracker performance fields, and writes consolidated guidance to <code>data/prompts/outreach_learnings.md</code>, which the copywriter agent consumes on its next run.</p>
 
 <h3>Adding a New Iteration (When You Flag a Bad Draft)</h3>
 <p>Open the <a href="https://www.notion.so/Iterations-on-Strategic-Partnersh-Copywriter-Agent-366a0c6e616880f8ba37ffa95d90b2fa">Iterations page</a> and add a new toggle inside <strong>Not yet processed ❌</strong> with:</p>

@@ -16,10 +16,13 @@ load_dotenv(PROJECT_ROOT / ".env", override=True)  # Project-specific (overrides
 
 # API Keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+APOLLO_API_KEY = os.getenv("APOLLO_API_KEY")
+APOLLO_LIST_ID_RAW = os.getenv("APOLLO_LIST_ID_RAW")
 NOTION_TOKEN = os.getenv("NOTION_TOKEN")
 NOTION_DB_QUALIFIED_ID = os.getenv("NOTION_DB_QUALIFIED_ID")
 NOTION_DB_ACCOUNTS_ID = os.getenv("NOTION_DB_ACCOUNTS_ID")  # Existing companies/accounts database
 NOTION_DB_CONTACTS_ID = os.getenv("NOTION_DB_CONTACTS_ID")  # Contacts database
+NOTION_DB_CAMPAIGNS_ID = os.getenv("NOTION_DB_CAMPAIGNS_ID")  # Campaign Tracking database
 
 # Email Delivery (Gmail App Password)
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")

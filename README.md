@@ -27,6 +27,7 @@ If an older onboarding page points to `github.com/tumsocialai/strategic-partners
 | Prepare Apollo enrichment review | `python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"` |
 | Upload Apollo export | `python agent.py upload --csv "apollo.csv" --sender "Full Name"` |
 | Generate outreach copy | `python agent.py copywrite --campaign Workflow_DDMM --sender "Full Name"` |
+| Sync Campaign Tracker | `python agent.py campaigns` |
 | LinkedIn follow-up review | `python agent.py linkedin --connections-file "network.html"` |
 | Company phone enrichment | `python agent.py phone-enrich` |
 | Infrastructure audit | `python agent.py supervisor` |
@@ -41,16 +42,19 @@ If an older onboarding page points to `github.com/tumsocialai/strategic-partners
 | `ranking_agent` | GPT-4o 0-10 scoring for impact fit, AI/talent relevance, student ecosystem signal, similarity to pipeline wins, and timing/trigger quality. |
 | `apollo_enrichment_agent` | Repeatable Apollo review flow: writes enrichment batches, merges Apollo connector/UI exports, splits mobile-required blockers from email-ready contacts, and emits a strict upload-ready CSV. |
 | `upload_agent` | Apollo CSV parsing, Notion schema/preflight checks, account/contact deduplication, campaign sender, campaign ID, and safe create/update behavior. |
-| `copywriter_agent` | Outreach skill prompt, processed feedback learnings, campaign sender, contact/account context, trigger event, and four generated messages. |
-| `feedback_agent` | Outreach outcome classification, A/B test analysis, Notion Iterations page ingestion, and `outreach_learnings.md` updates. |
+| `copywriter_agent` | Outreach skill prompt, Campaign Tracker history, processed feedback learnings, campaign sender, contact/account context, trigger event, A/B variant, and four generated messages. |
+| `campaign_tracker` | Notion Campaign Tracker backfill/sync from Accounts and Contacts: account relation, trigger, target audience, reasoning, engagement, and A/B performance. |
+| `feedback_agent` | Outreach outcome classification, A/B test analysis, Campaign Tracker updates, Notion Iterations page ingestion, and `outreach_learnings.md` updates. |
 | `linkedin_manager` | Saved LinkedIn connections HTML, Notion matching, follow-up/ghosting thresholds, and status hierarchy guards. |
 | `company_phone_enrichment_agent` | Notion Accounts filter, website page discovery, Impressum/Kontakt/contact scanning, phone normalization to `+...`, and safe phone-only updates. |
+
+Campaign tracking rule: setting `Campaign ID` on Accounts is only the first half of campaign creation. Every strategic partnership campaign must also have a Campaign Tracker database entry, related back to all targeted Accounts, with trigger, target audience, targeting reasoning, outreach summary, and A/B/performance fields. The upload, copywriter, and feedback agents sync this automatically; after manual CRM edits, run `python agent.py campaigns`.
 
 ## Requirements
 
 - Python 3.9+
 - OpenAI API key
-- Notion integration token with access to Accounts and Contacts databases
+- Notion integration token with access to Accounts, Contacts, and Campaign Tracker databases
 - Optional Gmail app password for report emails
 - Codex, Claude Code, Antigravity, or a normal terminal
 
@@ -69,7 +73,7 @@ Run on demand: ranking/top leads report, upload, copywriter, LinkedIn manager, s
 3. Search Apollo for contacts on the no-contact companies, keep known-contact companies separate, and write or review `apollo_contact_review.csv`.
 4. Run `python agent.py apollo-enrich` to create `apollo_enrichment_batches.json`.
 5. After approved Apollo enrichment, run `python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"` or `python agent.py apollo-enrich --apollo-csv "apollo_export.csv"`.
-6. Review `apollo_enriched_contacts_for_review.csv`. Senior marketing/recruiting/people contacts require a real mobile number; rows without that are blocked with `needs_mobile_scrape`. Other contacts only need email.
+6. Review `apollo_enriched_contacts_for_review.csv`. Senior marketing/recruiting/people, partnerships/BD, campus/university relations, ecosystem, and community contacts require a real mobile number; rows without that are blocked with `needs_mobile_scrape`. Other contacts only need email.
 7. Upload only after review approval: `python agent.py upload --csv data/tables/apollo_upload_ready.csv --sender "Full Name"`.
 
 Upload hard rules: new or updated Accounts are set to `Account Type* = Corporate`, new Contacts are set to `Contact Status = New`, and contact mobile/direct phone values are dropped when they match the company phone.

@@ -14,11 +14,10 @@ Usage:
 import sys
 import smtplib
 import argparse
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 
-import requests as http_requests
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from rich.console import Console
@@ -32,14 +31,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils.config import (
     OPENAI_API_KEY,
     NOTION_TOKEN,
+    NOTION_DB_ACCOUNTS_ID,
     NOTION_DB_CONTACTS_ID,
     GMAIL_ADDRESS,
     GMAIL_APP_PASSWORD,
     REPORT_RECIPIENT_EMAIL,
 )
 from utils.api_logger import log_api_usage
-from utils.notion_client import _notion_api_headers
 from utils.iterations_client import load_iterations, mark_iterations_processed
+from utils.campaign_tracker import (
+    build_campaign_records,
+    fetch_accounts as fetch_campaign_accounts,
+    fetch_contacts as fetch_campaign_contacts,
+    sync_campaign_tracker,
+)
 from agents.notion_cleanup import STATUS_HIERARCHY
 
 console = Console()
@@ -97,139 +102,55 @@ class FeedbackAnalysis(BaseModel):
 # Notion data fetching
 # =============================================================================
 
-def fetch_contacts_with_outreach(contacts_db_id: str) -> List[dict]:
+def _has_outreach(record: dict) -> bool:
+    """Return True when a CRM record has any generated outreach copy."""
+    return bool(
+        record.get("linkedin_first")
+        or record.get("linkedin_fu")
+        or record.get("email_body")
+        or record.get("email_subject")
+    )
+
+
+def fetch_contacts_with_outreach(contacts_db_id: str = "") -> List[dict]:
     """
-    Fetch all contacts that have outreach messages (LinkedIn 1st Cold is not empty).
+    Fetch all campaign-scoped outreach records from the CRM.
 
-    Returns list of dicts with contact fields, linked account status, and outreach text.
+    This intentionally uses the Campaign Tracker extraction layer rather than
+    querying only Contacts where LinkedIn 1st Cold is populated. That older
+    query missed email-only campaigns and account-level NGO outreach.
     """
-    headers = _notion_api_headers()
-    url = f"https://api.notion.com/v1/databases/{contacts_db_id}/query"
+    accounts = fetch_campaign_accounts()
+    raw_contacts = fetch_campaign_contacts()
+    campaign_records = build_campaign_records(accounts, raw_contacts)
 
-    query_filter = {
-        "property": "LinkedIn 1st Cold",
-        "rich_text": {"is_not_empty": True}
-    }
+    outreach_records = []
+    seen = set()
+    for campaign in campaign_records:
+        campaign_id = campaign.get("campaign_id", "")
+        for record in campaign.get("contacts", []):
+            if not _has_outreach(record):
+                continue
+            key = (campaign_id, record.get("id", ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            outreach_records.append({
+                "id": record.get("id", ""),
+                "storage": record.get("storage", "contact"),
+                "campaign_id": campaign_id,
+                "contact_name": record.get("contact_name") or record.get("name") or "(account-level outreach)",
+                "company_name": record.get("company_name", ""),
+                "account_status": record.get("account_status", ""),
+                "account_last_edited": record.get("account_last_edited") or record.get("last_edited_time", ""),
+                "ab_variant": (record.get("ab_variant") or "").upper(),
+                "linkedin_first": record.get("linkedin_first", ""),
+                "linkedin_fu": record.get("linkedin_fu", ""),
+                "email_body": record.get("email_body", ""),
+                "email_subject": record.get("email_subject", ""),
+            })
 
-    results = []
-    has_more = True
-    start_cursor = None
-
-    while has_more:
-        body = {"page_size": 100, "filter": query_filter}
-        if start_cursor:
-            body["start_cursor"] = start_cursor
-
-        resp = http_requests.post(url, headers=headers, json=body)
-        if resp.status_code != 200:
-            console.print(f"[red]Notion query error: {resp.status_code} - {resp.json().get('message', '')}[/red]")
-            return []
-
-        data = resp.json()
-        results.extend(data.get("results", []))
-        has_more = data.get("has_more", False)
-        start_cursor = data.get("next_cursor")
-
-    contacts = []
-    for page in results:
-        props = page.get("properties", {})
-
-        # Contact name
-        contact_name = ""
-        for pname, pdata in props.items():
-            if pdata.get("type") == "title":
-                titles = pdata.get("title", [])
-                if titles:
-                    contact_name = titles[0].get("plain_text", "")
-                break
-
-        # Outreach messages
-        def _rich_text(prop_name):
-            p = props.get(prop_name, {})
-            if p.get("type") == "rich_text" and p.get("rich_text"):
-                return p["rich_text"][0].get("plain_text", "")
-            return ""
-
-        linkedin_first = _rich_text("LinkedIn 1st Cold")
-        linkedin_fu = _rich_text("LinkedIn FU message")
-        email_body = _rich_text("Cold Email Body")
-        email_subject = _rich_text("Cold Email Subject")
-
-        # AB Variant
-        ab_variant = ""
-        ab_prop = props.get("AB Variant", {})
-        if ab_prop.get("type") == "select" and ab_prop.get("select"):
-            ab_variant = ab_prop["select"].get("name", "")
-
-        # Account status from rollup
-        account_status = ""
-        status_rollup = props.get("Account Status", {})
-        if status_rollup.get("type") == "rollup":
-            status_array = status_rollup.get("rollup", {}).get("array", [])
-            for item in status_array:
-                if item.get("type") == "status" and item.get("status"):
-                    account_status = item["status"].get("name", "")
-
-        # Account last_edited_time from relation
-        account_page_id = ""
-        account_rel = props.get("Accounts", {})
-        if account_rel.get("type") == "relation":
-            relations = account_rel.get("relation", [])
-            if relations:
-                account_page_id = relations[0].get("id", "")
-
-        # Company name from account (via a quick fetch if needed)
-        company_name = ""
-        account_last_edited = ""
-        if account_page_id:
-            account_data = _fetch_account_basics(account_page_id, headers)
-            company_name = account_data.get("company_name", "")
-            account_last_edited = account_data.get("last_edited_time", "")
-
-        contacts.append({
-            "contact_name": contact_name,
-            "company_name": company_name,
-            "account_status": account_status,
-            "account_last_edited": account_last_edited,
-            "ab_variant": ab_variant,
-            "linkedin_first": linkedin_first,
-            "linkedin_fu": linkedin_fu,
-            "email_body": email_body,
-            "email_subject": email_subject,
-        })
-
-    return contacts
-
-
-def _fetch_account_basics(account_page_id: str, headers: dict) -> dict:
-    """Fetch basic account fields (name, last_edited_time, status)."""
-    try:
-        resp = http_requests.get(
-            f"https://api.notion.com/v1/pages/{account_page_id}",
-            headers=headers
-        )
-        if resp.status_code != 200:
-            return {}
-
-        page = resp.json()
-        props = page.get("properties", {})
-
-        # Title
-        company_name = ""
-        for pdata in props.values():
-            if pdata.get("type") == "title":
-                titles = pdata.get("title", [])
-                if titles:
-                    company_name = titles[0].get("plain_text", "")
-                break
-
-        return {
-            "company_name": company_name,
-            "last_edited_time": page.get("last_edited_time", ""),
-        }
-
-    except Exception:
-        return {}
+    return outreach_records
 
 
 # =============================================================================
@@ -258,8 +179,8 @@ def classify_outcome(contact: dict) -> str:
     if idx == UNQUALIFIED_INDEX:
         return "failure"
 
-    # FAILURE: stuck at Contacted LinkedIn/Email for > STALE_DAYS
-    if status in ("Contacted LinkedIn \U0001f310", "Contacted Mail \U0001f4e9"):
+    # FAILURE: stuck at any Contacted state for > STALE_DAYS
+    if status.startswith("Contacted"):
         last_edited = contact.get("account_last_edited", "")
         if last_edited:
             try:
@@ -305,6 +226,91 @@ def compute_ab_stats(contacts: List[dict]) -> dict:
     return stats
 
 
+def _success_rate(success: int, failure: int) -> Optional[float]:
+    resolved = success + failure
+    if resolved <= 0:
+        return None
+    return success / resolved
+
+
+def _ab_winner(stats: dict) -> str:
+    a_rate = _success_rate(stats["A"]["success"], stats["A"]["failure"])
+    b_rate = _success_rate(stats["B"]["success"], stats["B"]["failure"])
+    a_resolved = stats["A"]["success"] + stats["A"]["failure"]
+    b_resolved = stats["B"]["success"] + stats["B"]["failure"]
+    if a_resolved == 0 and b_resolved == 0:
+        return "No Data"
+    if min(a_resolved, b_resolved) < 3 or a_rate is None or b_rate is None:
+        return "Inconclusive"
+    if abs(a_rate - b_rate) < 0.05:
+        return "Inconclusive"
+    return "A" if a_rate > b_rate else "B"
+
+
+def compute_campaign_stats(contacts: List[dict]) -> dict:
+    """Compute per-campaign outcome and A/B statistics."""
+    stats: dict = {}
+    for c in contacts:
+        campaign = c.get("campaign_id") or "Unknown"
+        if campaign not in stats:
+            stats[campaign] = {
+                "success": 0,
+                "failure": 0,
+                "skip": 0,
+                "total": 0,
+                "account_level": 0,
+                "A": {"success": 0, "failure": 0, "skip": 0, "total": 0},
+                "B": {"success": 0, "failure": 0, "skip": 0, "total": 0},
+                "none": {"success": 0, "failure": 0, "skip": 0, "total": 0},
+            }
+        bucket = stats[campaign]
+        outcome = c.get("outcome", "skip")
+        bucket[outcome] += 1
+        bucket["total"] += 1
+        if c.get("storage") == "account":
+            bucket["account_level"] += 1
+        variant = c.get("ab_variant", "")
+        variant_bucket = variant if variant in ("A", "B") else "none"
+        bucket[variant_bucket][outcome] += 1
+        bucket[variant_bucket]["total"] += 1
+
+    for campaign_stats in stats.values():
+        campaign_stats["success_rate"] = _success_rate(
+            campaign_stats["success"],
+            campaign_stats["failure"],
+        )
+        for variant in ("A", "B"):
+            campaign_stats[variant]["success_rate"] = _success_rate(
+                campaign_stats[variant]["success"],
+                campaign_stats[variant]["failure"],
+            )
+        campaign_stats["ab_winner"] = _ab_winner(campaign_stats)
+
+    return stats
+
+
+def format_campaign_stats_for_prompt(campaign_stats: dict, limit: int = 20) -> str:
+    """Format campaign stats for GPT prompt context."""
+    if not campaign_stats:
+        return ""
+    lines = []
+    sorted_items = sorted(
+        campaign_stats.items(),
+        key=lambda item: (item[1].get("success", 0) + item[1].get("failure", 0), item[1].get("total", 0)),
+        reverse=True,
+    )
+    for campaign, stats in sorted_items[:limit]:
+        rate = f"{stats['success_rate']:.0%}" if stats.get("success_rate") is not None else "N/A"
+        a_rate = f"{stats['A']['success_rate']:.0%}" if stats["A"].get("success_rate") is not None else "N/A"
+        b_rate = f"{stats['B']['success_rate']:.0%}" if stats["B"].get("success_rate") is not None else "N/A"
+        lines.append(
+            f"- {campaign}: {stats['total']} targeted records, "
+            f"{stats['success']} success, {stats['failure']} failure, {stats['skip']} pending, "
+            f"success rate {rate}, A {a_rate}, B {b_rate}, winner {stats.get('ab_winner', 'No Data')}"
+        )
+    return "\n".join(lines)
+
+
 # =============================================================================
 # GPT-4o analysis
 # =============================================================================
@@ -315,11 +321,16 @@ def run_gpt_analysis(
     ab_stats: dict,
     client: OpenAI,
     manual_iterations: str = "",
+    campaign_stats: Optional[dict] = None,
 ) -> Optional[FeedbackAnalysis]:
     """Run GPT-4o pattern analysis on outcomes, A/B stats, and manual iterations."""
 
     def _format_contact(c: dict) -> str:
         lines = [f"Contact: {c['contact_name']} @ {c['company_name']}"]
+        if c.get("campaign_id"):
+            lines.append(f"Campaign: {c['campaign_id']}")
+        if c.get("account_status"):
+            lines.append(f"Account status: {c['account_status']}")
         if c.get("ab_variant"):
             lines.append(f"Variant: {c['ab_variant']}")
         lines.append(f"LinkedIn 1st Cold: {c['linkedin_first']}")
@@ -349,6 +360,7 @@ def run_gpt_analysis(
         if manual_iterations.strip()
         else ""
     )
+    campaign_summary = format_campaign_stats_for_prompt(campaign_stats or {})
 
     prompt = f"""You are analyzing outreach message effectiveness for TUM Social AI, a student AI-for-Good initiative at TUM.
 
@@ -363,6 +375,9 @@ Variant A framing: "We're developing AI solutions with partners like UN Women"
 Variant B framing: "We're multiplying the impact of our social partners like UN Women in over 50 countries through custom AI tools"
 
 {ab_summary}
+
+## CAMPAIGN PERFORMANCE BY CAMPAIGN
+{campaign_summary or "(No campaign-scoped data available.)"}
 {manual_iterations_section}
 
 ## YOUR TASK
@@ -414,6 +429,7 @@ def write_learnings_file(
     n_success: int,
     n_failure: int,
     n_iterations: int = 0,
+    campaign_stats: Optional[dict] = None,
 ):
     """Write analysis results to the learnings markdown file."""
     LEARNINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -433,6 +449,17 @@ def write_learnings_file(
         rate = f"{s['success_rate']:.0%}" if s.get("success_rate") is not None else "N/A"
         lines.append(f"- Variant {v}: {s['success']}/{s['success'] + s['failure']} resolved → {rate} success rate")
     lines.append("")
+
+    if campaign_stats:
+        lines.append("## CAMPAIGN PERFORMANCE")
+        for campaign, stats in sorted(campaign_stats.items()):
+            rate = f"{stats['success_rate']:.0%}" if stats.get("success_rate") is not None else "N/A"
+            lines.append(
+                f"- {campaign}: {stats['success']} success / {stats['failure']} failure / "
+                f"{stats['skip']} pending across {stats['total']} targeted records; "
+                f"A/B winner: {stats.get('ab_winner', 'No Data')}; success rate: {rate}"
+            )
+        lines.append("")
 
     if analysis.iteration_learnings:
         lines.append("## MANUAL NOTION ITERATIONS")
@@ -479,6 +506,7 @@ def _generate_feedback_email_html(
     n_failure: int,
     n_skip: int,
     n_iterations: int = 0,
+    campaign_stats: Optional[dict] = None,
 ) -> str:
     """Generate HTML email body for the feedback report."""
 
@@ -497,6 +525,24 @@ def _generate_feedback_email_html(
 <p>{n_iterations} unprocessed iteration(s) from the Notion page were folded into the learnings file.</p>
 <ul>{_bullets(analysis.iteration_learnings)}</ul>
 """
+    campaign_rows = ""
+    if campaign_stats:
+        for campaign, s in sorted(campaign_stats.items()):
+            rate = f"{s['success_rate']:.0%}" if s.get("success_rate") is not None else "N/A"
+            campaign_rows += (
+                f"<tr><td>{campaign}</td><td>{s['total']}</td><td>{s['success']}</td>"
+                f"<td>{s['failure']}</td><td>{s['skip']}</td><td>{rate}</td>"
+                f"<td>{s.get('ab_winner', 'No Data')}</td></tr>"
+            )
+    campaign_section = ""
+    if campaign_rows:
+        campaign_section = f"""
+<h3>Campaign Performance</h3>
+<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+<tr style="background: #f5f5f5;"><th>Campaign</th><th>Total</th><th>Success</th><th>Failure</th><th>Pending</th><th>Rate</th><th>A/B</th></tr>
+{campaign_rows}
+</table>
+"""
 
     return f"""<html><body style="font-family: -apple-system, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px;">
 <h2>TUM Social AI — Weekly Outreach Feedback</h2>
@@ -509,6 +555,8 @@ def _generate_feedback_email_html(
 </table>
 <p><strong>Winner: {analysis.ab_winner}</strong> (confidence: {analysis.ab_confidence})</p>
 <p>{analysis.ab_interpretation}</p>
+
+{campaign_section}
 
 <h3>Winning Patterns</h3>
 <ul>{_bullets(analysis.winning_patterns)}</ul>
@@ -536,6 +584,7 @@ def send_feedback_email(
     n_failure: int,
     n_skip: int,
     n_iterations: int = 0,
+    campaign_stats: Optional[dict] = None,
 ) -> bool:
     """Send feedback report email."""
     if not GMAIL_ADDRESS or not GMAIL_APP_PASSWORD:
@@ -557,7 +606,15 @@ def send_feedback_email(
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
 
-    html_body = _generate_feedback_email_html(analysis, ab_stats, n_success, n_failure, n_skip, n_iterations)
+    html_body = _generate_feedback_email_html(
+        analysis,
+        ab_stats,
+        n_success,
+        n_failure,
+        n_skip,
+        n_iterations,
+        campaign_stats=campaign_stats,
+    )
     msg.attach(MIMEText(html_body, "html"))
 
     try:
@@ -594,8 +651,8 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
     if not OPENAI_API_KEY:
         console.print("[red]Error: OPENAI_API_KEY not configured[/red]")
         return
-    if not NOTION_TOKEN or not NOTION_DB_CONTACTS_ID:
-        console.print("[red]Error: NOTION_TOKEN or NOTION_DB_CONTACTS_ID not configured[/red]")
+    if not NOTION_TOKEN or not NOTION_DB_ACCOUNTS_ID:
+        console.print("[red]Error: NOTION_TOKEN or NOTION_DB_ACCOUNTS_ID not configured[/red]")
         return
 
     # Step 1: Load manual copywriter iterations from Notion.
@@ -617,7 +674,7 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
             console.print("[yellow]No manual iterations found either. Nothing to analyze.[/yellow]")
             return
 
-    console.print(f"[cyan]Found {len(contacts)} contacts with outreach messages[/cyan]")
+    console.print(f"[cyan]Found {len(contacts)} campaign-scoped outreach records[/cyan]")
 
     # Step 3: Classify outcomes
     successes = []
@@ -660,6 +717,31 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
         ab_table.add_row(label, str(s["total"]), str(s["success"]), str(s["failure"]), rate)
     console.print(ab_table)
 
+    campaign_stats = compute_campaign_stats(contacts)
+    campaign_table = Table(title="Campaign Performance")
+    campaign_table.add_column("Campaign", style="cyan")
+    campaign_table.add_column("Total", justify="right")
+    campaign_table.add_column("Success", style="green", justify="right")
+    campaign_table.add_column("Failure", style="red", justify="right")
+    campaign_table.add_column("Pending", justify="right")
+    campaign_table.add_column("A/B")
+    campaign_table.add_column("Account-level", justify="right")
+    for campaign, s in sorted(campaign_stats.items()):
+        campaign_table.add_row(
+            campaign,
+            str(s["total"]),
+            str(s["success"]),
+            str(s["failure"]),
+            str(s["skip"]),
+            s.get("ab_winner", "No Data"),
+            str(s.get("account_level", 0)),
+        )
+    console.print(campaign_table)
+
+    if not dry_run:
+        console.print("\n[cyan]Syncing Campaign Tracker with latest outcome and A/B stats...[/cyan]")
+        sync_campaign_tracker()
+
     # Step 5: Check minimum data threshold
     resolved = len(successes) + len(failures)
     if resolved < min_data and not iterations_injection:
@@ -676,7 +758,14 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
     console.print(f"\n[cyan]Running GPT-4o pattern analysis ({len(successes)} successes, {len(failures)} failures)...[/cyan]")
     client = OpenAI(api_key=OPENAI_API_KEY)
 
-    analysis = run_gpt_analysis(successes, failures, ab_stats, client, iterations_injection)
+    analysis = run_gpt_analysis(
+        successes,
+        failures,
+        ab_stats,
+        client,
+        iterations_injection,
+        campaign_stats=campaign_stats,
+    )
     if not analysis:
         console.print("[red]GPT-4o analysis failed. Aborting.[/red]")
         return
@@ -706,14 +795,29 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
 
     # Step 7: Write learnings file
     if not dry_run:
-        write_learnings_file(analysis, ab_stats, len(successes), len(failures), n_iterations)
+        write_learnings_file(
+            analysis,
+            ab_stats,
+            len(successes),
+            len(failures),
+            n_iterations,
+            campaign_stats=campaign_stats,
+        )
 
         if iterations_block_ids:
             console.print("\n[cyan]Marking Notion iterations as processed...[/cyan]")
             mark_iterations_processed(iterations_block_ids)
 
         # Step 8: Send email report
-        send_feedback_email(analysis, ab_stats, len(successes), len(failures), len(skips), n_iterations)
+        send_feedback_email(
+            analysis,
+            ab_stats,
+            len(successes),
+            len(failures),
+            len(skips),
+            n_iterations,
+            campaign_stats=campaign_stats,
+        )
     else:
         console.print("\n[yellow]Dry run — skipped writing learnings, marking iterations processed, and sending email[/yellow]")
 
