@@ -44,6 +44,7 @@ from utils.notion_client import (
 from utils.preflight import run_preflight
 from utils.gmail_client import create_draft as gmail_create_draft
 from utils.copywriting_guidance import load_humanized_guidance
+from utils.campaign_tracker import load_campaign_guidance, sync_campaign_tracker
 
 console = Console()
 
@@ -478,7 +479,7 @@ def build_rrr_cold_email(contact: dict) -> tuple[str, str]:
     return subject, body
 
 
-def build_contact_prompt(contact: dict, campaign_id: str = "") -> str:
+def build_contact_prompt(contact: dict, campaign_id: str = "", campaign_guidance: str = "") -> str:
     """
     Build the user prompt for GPT-4o with all available contact + account context.
 
@@ -558,6 +559,9 @@ def build_contact_prompt(contact: dict, campaign_id: str = "") -> str:
     lines.append("\n## PERSONA-SPECIFIC STRATEGY")
     lines.append(persona_strategy(job_title))
 
+    if campaign_guidance:
+        lines.append(campaign_guidance)
+
     lines.append("\n## LANGUAGE")
     contact_country_lower = (country or "").lower().strip()
     if campaign_id == "NGO_180526_InvoiceManagement" and contact_country_lower in DACH_COUNTRIES:
@@ -569,6 +573,7 @@ def build_contact_prompt(contact: dict, campaign_id: str = "") -> str:
 
     lines.append("\n## INSTRUCTIONS")
     lines.append("- Follow the OUTREACH SKILL rules exactly")
+    lines.append("- Always preserve A/B testing: this contact has an assigned A/B variant. Use the active variant instructions and write the AB Variant property when saving.")
     lines.append("- Act like a YC-level Head of Sales: concise, commercially sharp, persona-relevant, and allergic to vague partnership language")
     lines.append("- Use the RRR framework: Relevance (persona JTBD or trigger), Reward (proof/namedrops tied to their benefit), Request (short call next week with a concrete day anchor)")
     lines.append("- Each message MUST reference something specific about this company or contact")
@@ -587,7 +592,14 @@ def build_contact_prompt(contact: dict, campaign_id: str = "") -> str:
     return "\n".join(lines)
 
 
-def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant: str = "", campaign_id: str = "") -> OutreachMessages:
+def generate_outreach(
+    contact: dict,
+    skill_prompt: str,
+    client: OpenAI,
+    variant: str = "",
+    campaign_id: str = "",
+    campaign_guidance: str = "",
+) -> OutreachMessages:
     """
     Call GPT-4o to generate 4 outreach messages for a contact.
 
@@ -600,7 +612,7 @@ def generate_outreach(contact: dict, skill_prompt: str, client: OpenAI, variant:
     Returns:
         OutreachMessages with the 4 generated messages.
     """
-    user_prompt = build_contact_prompt(contact, campaign_id=campaign_id)
+    user_prompt = build_contact_prompt(contact, campaign_id=campaign_id, campaign_guidance=campaign_guidance)
 
     # Build full system prompt: skill + campaign override + variant addendum + learnings
     full_system_prompt = skill_prompt
@@ -719,6 +731,14 @@ def run_copywriter(
     if LEARNINGS_PATH.exists():
         console.print(f"[cyan]Learnings file found — will inject into prompts[/cyan]")
 
+    campaign_guidance = load_campaign_guidance(campaign_id)
+    if campaign_guidance:
+        console.print(Panel(
+            campaign_guidance,
+            title="Campaign Tracker guidance",
+            border_style="cyan",
+        ))
+
     contacts_available = True
     prop_map = None
 
@@ -760,6 +780,8 @@ def run_copywriter(
 
     if not contacts:
         console.print("[green]All contacts already have outreach messages. Nothing to do.[/green]")
+        if not dry_run and campaign_id:
+            sync_campaign_tracker(campaign_id=campaign_id)
         return
 
     console.print(f"[cyan]Found {len(contacts)} contacts needing messages[/cyan]")
@@ -795,7 +817,14 @@ def run_copywriter(
                 console.print(f"  [dim]No careers page found[/dim]")
 
         try:
-            messages = generate_outreach(contact, skill_prompt, client, variant=variant, campaign_id=campaign_id)
+            messages = generate_outreach(
+                contact,
+                skill_prompt,
+                client,
+                variant=variant,
+                campaign_id=campaign_id,
+                campaign_guidance=campaign_guidance,
+            )
             generated += 1
 
             # Preview
@@ -863,6 +892,10 @@ def run_copywriter(
         summary.add_row("Campaign filter", campaign_id)
     summary.add_row("Campaign sender", campaign_sender)
     console.print(summary)
+
+    if not dry_run:
+        console.print("\n[cyan]Syncing Campaign Tracker after copywriter run...[/cyan]")
+        sync_campaign_tracker(campaign_id=campaign_id)
 
 
 if __name__ == "__main__":

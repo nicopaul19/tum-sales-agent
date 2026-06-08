@@ -31,10 +31,10 @@ from utils.gmail_client import (  # noqa: E402
 )
 
 
-EVENT_NAME = "AI for Good Hackathon: Africa"
-EVENT_DATE = "June 27-28"
-EVENT_LOCATION = "TU Munich"
-ORGANIZERS = "NamibAI and TUM.ai"
+EVENT_NAME = "AI-for-Good Hackathon"
+EVENT_DATE = "June 26"
+EVENT_LOCATION = "Munich university ecosystem"
+ORGANIZERS = "OpenAI, Lovable, and other partners"
 
 
 @dataclass
@@ -187,11 +187,13 @@ def angle_sentence(company: str, angle: str) -> str:
 def build_body(greeting: str, company: str, angle: str, sender: str) -> str:
     return (
         f"Hi {greeting},\n\n"
+        f"First of all, congrats to your new funding round recently! As {company} is probably "
+        f"going to grow a lot in the coming months, I thought I might reach out with a proposal "
+        f"around talent access and visibility in the Munich university ecosystem.\n\n"
         f"{opening_question(company, angle)} As TUM Social AI, we are hosting the \"{EVENT_NAME}\" "
-        f"on {EVENT_DATE} at the {EVENT_LOCATION} together with {ORGANIZERS}. It is positioned "
-        "as Munich's largest AI for Good Hackathon, with interdisciplinary students building real "
-        "AI applications for global non-profits. We're already partnering up with organizations "
-        "like the UN, OpenAI and Lovable.\n\n"
+        f"on {EVENT_DATE} in the {EVENT_LOCATION} together with {ORGANIZERS}. It is positioned "
+        "around interdisciplinary students building real AI applications for global non-profits. "
+        "We're already partnering up with organizations like the UN, OpenAI and Lovable.\n\n"
         f"{angle_sentence(company, angle)}\n\n"
         "We are looking for sponsors and tech-stack/API/cloud-credit partners. In return we can offer "
         "keynote-stage visibility, booth presence, exclusive CV access, social media reach inside "
@@ -293,6 +295,7 @@ def audit_rewrite(rewrite: DraftRewrite) -> list[str]:
         EVENT_NAME,
         EVENT_DATE,
         EVENT_LOCATION,
+        "new funding round",
         "global non-profits",
         "real AI applications",
         "the UN",

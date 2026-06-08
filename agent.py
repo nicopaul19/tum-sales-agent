@@ -74,6 +74,10 @@ def main() -> int:
     feedback.add_argument("--dry-run", action="store_true", help="Analyze without writing learnings")
     feedback.add_argument("--min-data", type=int, default=10, help="Minimum resolved outcomes")
 
+    campaigns = sub.add_parser("campaigns", help="Sync Notion Campaign Tracker from Accounts and Contacts")
+    campaigns.add_argument("--campaign", default="", help="Only sync one Campaign ID")
+    campaigns.add_argument("--dry-run", action="store_true", help="Preview without writing to Notion")
+
     cleanup = sub.add_parser("cleanup", help="Run Notion cleanup")
     cleanup.add_argument("--domains", action="store_true", help="Populate missing domains")
     cleanup.add_argument("--merge", action="store_true", help="Merge duplicates")
@@ -149,6 +153,13 @@ def main() -> int:
         if args.dry_run:
             module_args.append("--dry-run")
         return run_module("agents.feedback_agent", module_args)
+    if args.command == "campaigns":
+        module_args = []
+        if args.campaign:
+            module_args += ["--campaign", args.campaign]
+        if args.dry_run:
+            module_args.append("--dry-run")
+        return run_module("utils.campaign_tracker", module_args)
     if args.command == "cleanup":
         module_args = []
         if args.domains:

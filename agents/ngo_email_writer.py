@@ -39,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.config import NOTION_TOKEN, NOTION_DB_ACCOUNTS_ID
 from utils.notion_client import NOTION_API_VERSION
+from utils.campaign_tracker import load_campaign_guidance, sync_campaign_tracker
 
 console = Console()
 
@@ -119,8 +120,36 @@ Best regards,
 {sender}\
 """
 
+GERMAN_BODY_B = """\
+Hallo {salutation},
+
+mein Name ist {sender}, Mitgründer von TUM Social AI, Deutschlands erster AI-for-Good Studentenorganisation an der Technischen Universität München. Wir pilotieren mit Entreculturas ein pro-bono KI-Tool, das Rechnungsprüfung und Rechnungsverwaltung für Nonprofits stark vereinfacht.
+
+Wäre das für {ngo_name} relevant, falls Sie für Ihre {work_area} Arbeit regelmäßig Rechnungen von lokalen Partnerorganisationen prüfen müssen? Wir suchen weitere Nonprofits, die das Tool mit uns testen. Sobald es ausgereift ist, stellen wir es kostenfrei bereit.
+
+Wäre nächste Woche ein kurzer Austausch relevant?
+
+Beste Grüße,
+{sender}\
+"""
+
+ENGLISH_BODY_B = """\
+Hi {salutation},
+
+My name is {sender}, co-founder of TUM Social AI, Germany's first AI-for-Good student organization at the Technical University of Munich. We are piloting a pro-bono AI invoice inspection and management tool with Entreculturas.
+
+Would this be relevant for {ngo_name} if your {work_area} work involves regularly reviewing invoices from local partner organizations? We are looking for more nonprofits to test the tool with us. Once mature, we will provide it free of charge.
+
+Would a short exchange next week be relevant?
+
+Best regards,
+{sender}\
+"""
+
 GERMAN_SUBJECT = "{ngo_name} || TUM Social AI: KI-Rechnungsprüfung"
 ENGLISH_SUBJECT = "{ngo_name} || TUM Social AI: AI Invoice Inspection"
+GERMAN_SUBJECT_B = "{ngo_name} x TUM Social AI"
+ENGLISH_SUBJECT_B = "{ngo_name} x TUM Social AI"
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +222,7 @@ def fetch_campaign_accounts() -> list[dict]:
     return accounts
 
 
-def write_to_notion(page_id: str, subject: str, body: str, owner: dict) -> bool:
+def write_to_notion(page_id: str, subject: str, body: str, owner: dict, ab_variant: str) -> bool:
     """Write email content, subject, owner, and campaign sender to a Notion account page."""
     resp = http_requests.patch(
         f"https://api.notion.com/v1/pages/{page_id}",
@@ -204,6 +233,7 @@ def write_to_notion(page_id: str, subject: str, body: str, owner: dict) -> bool:
                 "Cold Email Body": {"rich_text": [{"text": {"content": body}}]},
                 "Campaign Sender": {"rich_text": [{"text": {"content": owner["full_name"]}}]},
                 "Owner*": {"people": [{"object": "user", "id": owner["notion_id"]}]},
+                "AB Variant": {"select": {"name": ab_variant}},
             }
         },
     )
@@ -216,7 +246,7 @@ def write_to_notion(page_id: str, subject: str, body: str, owner: dict) -> bool:
 # Template fill logic
 # ---------------------------------------------------------------------------
 
-def build_email(account: dict, owner: dict) -> tuple[str, str]:
+def build_email(account: dict, owner: dict, variant: str = "A") -> tuple[str, str]:
     """
     Return (subject, body) filled from account data and owner.
     Language is German for DACH countries, English otherwise.
@@ -243,16 +273,20 @@ def build_email(account: dict, owner: dict) -> tuple[str, str]:
     sender_name = owner["full_name"]
 
     if is_german:
-        subject = GERMAN_SUBJECT.format(ngo_name=ngo_name)
-        body = GERMAN_BODY.format(
+        subject_template = GERMAN_SUBJECT_B if variant == "B" else GERMAN_SUBJECT
+        body_template = GERMAN_BODY_B if variant == "B" else GERMAN_BODY
+        subject = subject_template.format(ngo_name=ngo_name)
+        body = body_template.format(
             salutation=salutation,
             ngo_name=ngo_name,
             work_area=work_area,
             sender=sender_name,
         )
     else:
-        subject = ENGLISH_SUBJECT.format(ngo_name=ngo_name)
-        body = ENGLISH_BODY.format(
+        subject_template = ENGLISH_SUBJECT_B if variant == "B" else ENGLISH_SUBJECT
+        body_template = ENGLISH_BODY_B if variant == "B" else ENGLISH_BODY
+        subject = subject_template.format(ngo_name=ngo_name)
+        body = body_template.format(
             salutation=salutation,
             ngo_name=ngo_name,
             work_area=work_area,
@@ -280,6 +314,10 @@ def run(dry_run: bool = False, force: bool = False):
     if not NOTION_TOKEN or not NOTION_DB_ACCOUNTS_ID:
         console.print("[red]Error: NOTION_TOKEN or NOTION_DB_ACCOUNTS_ID not set[/red]")
         return
+
+    guidance = load_campaign_guidance(CAMPAIGN_ID)
+    if guidance:
+        console.print(Panel(guidance, title="Campaign Tracker guidance", border_style="cyan"))
 
     console.print(f"\n[cyan]Fetching accounts tagged with {CAMPAIGN_ID}...[/cyan]")
     accounts = fetch_campaign_accounts()
@@ -311,10 +349,13 @@ def run(dry_run: bool = False, force: bool = False):
 
     written = skipped = errors = german = english = 0
     carlo_count = lisa_count = 0
+    variant_counts = {"A": 0, "B": 0}
 
     for i, acc in enumerate(accounts, 1):
         name = acc["name"] or "(no name)"
         owner = owner_map[acc["page_id"]]
+        variant = "A" if i % 2 == 1 else "B"
+        variant_counts[variant] += 1
 
         # Skip if email already exists and not forcing
         if not force and acc["existing_email_body"]:
@@ -322,7 +363,7 @@ def run(dry_run: bool = False, force: bool = False):
             skipped += 1
             continue
 
-        subject, body = build_email(acc, owner)
+        subject, body = build_email(acc, owner, variant=variant)
         is_de = acc["country"] in DACH_COUNTRIES
         lang_label = "[DE]" if is_de else "[EN]"
         owner_label = f"[{owner['first_name']}]"
@@ -336,13 +377,13 @@ def run(dry_run: bool = False, force: bool = False):
             lisa_count += 1
 
         console.print(Panel(
-            f"[cyan]Owner:[/cyan] {owner['full_name']}   [cyan]Subject:[/cyan] {subject}\n\n{body}",
+            f"[cyan]Owner:[/cyan] {owner['full_name']}   [cyan]Variant:[/cyan] {variant}   [cyan]Subject:[/cyan] {subject}\n\n{body}",
             title=f"({i}/{len(accounts)}) {lang_label} {owner_label} {name}",
             border_style="green" if is_de else "blue",
         ))
 
         if not dry_run:
-            ok = write_to_notion(acc["page_id"], subject, body, owner)
+            ok = write_to_notion(acc["page_id"], subject, body, owner, variant)
             if ok:
                 written += 1
                 console.print(f"  [green]✓ Written[/green]")
@@ -364,9 +405,14 @@ def run(dry_run: bool = False, force: bool = False):
     t.add_row("English emails", str(english))
     t.add_row(f"Assigned to {OWNERS[0]['full_name']}", str(carlo_count))
     t.add_row(f"Assigned to {OWNERS[1]['full_name']}", str(lisa_count))
+    t.add_row("Variant A / B", f"{variant_counts['A']} / {variant_counts['B']}")
     t.add_row("Written to Notion", str(written))
     t.add_row("Errors", str(errors))
     console.print(t)
+
+    if not dry_run:
+        console.print("\n[cyan]Syncing Campaign Tracker after NGO email writer run...[/cyan]")
+        sync_campaign_tracker(campaign_id=CAMPAIGN_ID)
 
 
 if __name__ == "__main__":
