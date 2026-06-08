@@ -55,6 +55,37 @@ ENGAGED_INDEX = 7
 UNQUALIFIED_INDEX = 12
 STALE_DAYS = 30
 MAX_RELATION_ACCOUNTS = 100
+CAMPAIGN_PAGE_ICON = "⛺"
+
+TRACKER_PROPS = {
+    "campaign_id": "🏷️ Campaign ID",
+    "campaign_type": "🤝 Campaign Team",
+    "accounts": "🏢 Accounts",
+    "campaign_trigger": "⚡ Campaign Trigger",
+    "target_audience": "🎯 Target Audience",
+    "targeting_reasoning": "🧠 Targeting Reasoning",
+    "outreach_summary": "📧 Outreach Summary",
+    "crm_notes": "📝 CRM Notes",
+    "accounts_count": "🏢 Accounts Count",
+    "contacts_count": "👥 Contacts Count",
+    "engaged_contacts": "✅ Engaged Contacts",
+    "not_engaged_contacts": "🚫 Not Engaged Contacts",
+    "pending_contacts": "⏳ Pending Contacts",
+    "failed_contacts": "❌ Failed Contacts",
+    "success_rate": "📈 Success Rate",
+    "a_total": "🧪 A Total",
+    "a_engaged": "✅ A Engaged",
+    "a_not_engaged": "🚫 A Not Engaged",
+    "a_success_rate": "📈 A Success Rate",
+    "b_total": "🧪 B Total",
+    "b_engaged": "✅ B Engaged",
+    "b_not_engaged": "🚫 B Not Engaged",
+    "b_success_rate": "📈 B Success Rate",
+    "ab_winner": "🏆 A/B Winner",
+    "first_seen": "🗓️ First Seen",
+    "last_synced": "🔄 Last Synced",
+    "sync_status": "🔄 Sync Status",
+}
 
 
 def _normalize_notion_id(value: str | None) -> str:
@@ -237,9 +268,10 @@ def ensure_campaign_tracker_schema(dry_run: bool = False) -> str:
     existing = database.get("properties", {})
     missing: dict[str, dict] = {}
 
+    p = TRACKER_PROPS
     wanted = {
-        "Campaign ID": {"rich_text": {}},
-        "Campaign Type": {
+        p["campaign_id"]: {"rich_text": {}},
+        p["campaign_type"]: {
             "select": {
                 "options": [
                     {"name": "Strategic Partnerships", "color": "blue"},
@@ -248,27 +280,27 @@ def ensure_campaign_tracker_schema(dry_run: bool = False) -> str:
                 ]
             }
         },
-        "Campaign Trigger": {"rich_text": {}},
-        "Target Audience": {"rich_text": {}},
-        "Targeting Reasoning": {"rich_text": {}},
-        "Outreach Summary": {"rich_text": {}},
-        "CRM Notes": {"rich_text": {}},
-        "Accounts Count": {"number": {"format": "number"}},
-        "Contacts Count": {"number": {"format": "number"}},
-        "Engaged Contacts": {"number": {"format": "number"}},
-        "Not Engaged Contacts": {"number": {"format": "number"}},
-        "Pending Contacts": {"number": {"format": "number"}},
-        "Failed Contacts": {"number": {"format": "number"}},
-        "Success Rate": {"number": {"format": "percent"}},
-        "A Total": {"number": {"format": "number"}},
-        "A Engaged": {"number": {"format": "number"}},
-        "A Not Engaged": {"number": {"format": "number"}},
-        "A Success Rate": {"number": {"format": "percent"}},
-        "B Total": {"number": {"format": "number"}},
-        "B Engaged": {"number": {"format": "number"}},
-        "B Not Engaged": {"number": {"format": "number"}},
-        "B Success Rate": {"number": {"format": "percent"}},
-        "A/B Winner": {
+        p["campaign_trigger"]: {"rich_text": {}},
+        p["target_audience"]: {"rich_text": {}},
+        p["targeting_reasoning"]: {"rich_text": {}},
+        p["outreach_summary"]: {"rich_text": {}},
+        p["crm_notes"]: {"rich_text": {}},
+        p["accounts_count"]: {"number": {"format": "number"}},
+        p["contacts_count"]: {"number": {"format": "number"}},
+        p["engaged_contacts"]: {"number": {"format": "number"}},
+        p["not_engaged_contacts"]: {"number": {"format": "number"}},
+        p["pending_contacts"]: {"number": {"format": "number"}},
+        p["failed_contacts"]: {"number": {"format": "number"}},
+        p["success_rate"]: {"number": {"format": "percent"}},
+        p["a_total"]: {"number": {"format": "number"}},
+        p["a_engaged"]: {"number": {"format": "number"}},
+        p["a_not_engaged"]: {"number": {"format": "number"}},
+        p["a_success_rate"]: {"number": {"format": "percent"}},
+        p["b_total"]: {"number": {"format": "number"}},
+        p["b_engaged"]: {"number": {"format": "number"}},
+        p["b_not_engaged"]: {"number": {"format": "number"}},
+        p["b_success_rate"]: {"number": {"format": "percent"}},
+        p["ab_winner"]: {
             "select": {
                 "options": [
                     {"name": "A", "color": "green"},
@@ -278,9 +310,9 @@ def ensure_campaign_tracker_schema(dry_run: bool = False) -> str:
                 ]
             }
         },
-        "First Seen": {"date": {}},
-        "Last Synced": {"date": {}},
-        "Sync Status": {
+        p["first_seen"]: {"date": {}},
+        p["last_synced"]: {"date": {}},
+        p["sync_status"]: {
             "select": {
                 "options": [
                     {"name": "Synced", "color": "green"},
@@ -294,8 +326,8 @@ def ensure_campaign_tracker_schema(dry_run: bool = False) -> str:
         if name not in existing:
             missing[name] = spec
 
-    if "Accounts" not in existing:
-        missing["Accounts"] = {"relation": {"database_id": accounts_db, "single_property": {}}}
+    if p["accounts"] not in existing:
+        missing[p["accounts"]] = {"relation": {"database_id": accounts_db, "single_property": {}}}
 
     if missing and dry_run:
         console.print(f"[yellow]Dry run - would add {len(missing)} Campaign Tracker properties[/yellow]")
@@ -678,6 +710,7 @@ def _existing_campaign_pages(title_prop: str) -> dict[str, str]:
 
 
 def _record_properties(record: dict, title_prop: str) -> dict:
+    p = TRACKER_PROPS
     stats = record["ab_stats"]
     a_total = stats["A"]["total"]
     b_total = stats["B"]["total"]
@@ -686,33 +719,33 @@ def _record_properties(record: dict, title_prop: str) -> dict:
     relation_accounts = [{"id": account["id"]} for account in record["accounts"][:MAX_RELATION_ACCOUNTS]]
     return {
         title_prop: _title(record["campaign_id"]),
-        "Campaign ID": _rich_text(record["campaign_id"]),
-        "Campaign Type": {"select": {"name": record["campaign_type"]}},
-        "Accounts": {"relation": relation_accounts},
-        "Campaign Trigger": _rich_text(record["trigger"]),
-        "Target Audience": _rich_text(record["target_audience"]),
-        "Targeting Reasoning": _rich_text(record["targeting_reasoning"]),
-        "Outreach Summary": _rich_text(record["outreach_summary"]),
-        "CRM Notes": _rich_text(record["crm_notes"]),
-        "Accounts Count": {"number": record["accounts_count"]},
-        "Contacts Count": {"number": record["contacts_count"]},
-        "Engaged Contacts": {"number": record["engaged_contacts"]},
-        "Not Engaged Contacts": {"number": record["not_engaged_contacts"]},
-        "Pending Contacts": {"number": record["pending_contacts"]},
-        "Failed Contacts": {"number": record["failed_contacts"]},
-        "Success Rate": {"number": record["success_rate"]},
-        "A Total": {"number": a_total},
-        "A Engaged": {"number": stats["A"]["success"]},
-        "A Not Engaged": {"number": a_not},
-        "A Success Rate": {"number": _percent(stats["A"]["success"], a_total)},
-        "B Total": {"number": b_total},
-        "B Engaged": {"number": stats["B"]["success"]},
-        "B Not Engaged": {"number": b_not},
-        "B Success Rate": {"number": _percent(stats["B"]["success"], b_total)},
-        "A/B Winner": {"select": {"name": record["ab_winner"]}},
-        "First Seen": _date(record["first_seen"]),
-        "Last Synced": _date(record["last_synced"]),
-        "Sync Status": {"select": {"name": record["sync_status"]}},
+        p["campaign_id"]: _rich_text(record["campaign_id"]),
+        p["campaign_type"]: {"select": {"name": record["campaign_type"]}},
+        p["accounts"]: {"relation": relation_accounts},
+        p["campaign_trigger"]: _rich_text(record["trigger"]),
+        p["target_audience"]: _rich_text(record["target_audience"]),
+        p["targeting_reasoning"]: _rich_text(record["targeting_reasoning"]),
+        p["outreach_summary"]: _rich_text(record["outreach_summary"]),
+        p["crm_notes"]: _rich_text(record["crm_notes"]),
+        p["accounts_count"]: {"number": record["accounts_count"]},
+        p["contacts_count"]: {"number": record["contacts_count"]},
+        p["engaged_contacts"]: {"number": record["engaged_contacts"]},
+        p["not_engaged_contacts"]: {"number": record["not_engaged_contacts"]},
+        p["pending_contacts"]: {"number": record["pending_contacts"]},
+        p["failed_contacts"]: {"number": record["failed_contacts"]},
+        p["success_rate"]: {"number": record["success_rate"]},
+        p["a_total"]: {"number": a_total},
+        p["a_engaged"]: {"number": stats["A"]["success"]},
+        p["a_not_engaged"]: {"number": a_not},
+        p["a_success_rate"]: {"number": _percent(stats["A"]["success"], a_total)},
+        p["b_total"]: {"number": b_total},
+        p["b_engaged"]: {"number": stats["B"]["success"]},
+        p["b_not_engaged"]: {"number": b_not},
+        p["b_success_rate"]: {"number": _percent(stats["B"]["success"], b_total)},
+        p["ab_winner"]: {"select": {"name": record["ab_winner"]}},
+        p["first_seen"]: _date(record["first_seen"]),
+        p["last_synced"]: _date(record["last_synced"]),
+        p["sync_status"]: {"select": {"name": record["sync_status"]}},
     }
 
 
@@ -723,15 +756,16 @@ def upsert_campaign_records(records: list[dict], title_prop: str) -> tuple[int, 
     updated = 0
     for record in records:
         props = _record_properties(record, title_prop)
+        payload = {"icon": {"type": "emoji", "emoji": CAMPAIGN_PAGE_ICON}, "properties": props}
         page_id = existing.get(record["campaign_id"])
         if page_id:
-            _notion_request("PATCH", f"/v1/pages/{page_id}", {"properties": props})
+            _notion_request("PATCH", f"/v1/pages/{page_id}", payload)
             updated += 1
         else:
             _notion_request(
                 "POST",
                 "/v1/pages",
-                {"parent": {"database_id": campaigns_db}, "properties": props},
+                {"parent": {"database_id": campaigns_db}, **payload},
             )
             created += 1
         time.sleep(0.12)
@@ -796,16 +830,17 @@ def load_campaign_guidance(campaign_id: str = "", limit: int = 5) -> str:
 
     def page_summary(page: dict) -> dict:
         props = page.get("properties", {})
+        p = TRACKER_PROPS
         return {
             "name": _plain_text(props.get(title_prop, {})),
-            "trigger": _plain_text(props.get("Campaign Trigger", {})),
-            "audience": _plain_text(props.get("Target Audience", {})),
-            "reasoning": _plain_text(props.get("Targeting Reasoning", {})),
-            "summary": _plain_text(props.get("Outreach Summary", {})),
-            "contacts": _plain_text(props.get("Contacts Count", {})),
-            "engaged": _plain_text(props.get("Engaged Contacts", {})),
-            "not_engaged": _plain_text(props.get("Not Engaged Contacts", {})),
-            "winner": _plain_text(props.get("A/B Winner", {})),
+            "trigger": _plain_text(props.get(p["campaign_trigger"], {})),
+            "audience": _plain_text(props.get(p["target_audience"], {})),
+            "reasoning": _plain_text(props.get(p["targeting_reasoning"], {})),
+            "summary": _plain_text(props.get(p["outreach_summary"], {})),
+            "contacts": _plain_text(props.get(p["contacts_count"], {})),
+            "engaged": _plain_text(props.get(p["engaged_contacts"], {})),
+            "not_engaged": _plain_text(props.get(p["not_engaged_contacts"], {})),
+            "winner": _plain_text(props.get(p["ab_winner"], {})),
             "last_edited": page.get("last_edited_time", ""),
         }
 
