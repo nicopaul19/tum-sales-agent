@@ -19,7 +19,6 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Tuple
 
-import requests as http_requests
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from rich.console import Console
@@ -27,6 +26,8 @@ from rich.table import Table
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from utils import resilient_http as http_requests
 
 from utils.config import (
     OPENAI_API_KEY,
@@ -348,7 +349,7 @@ def resolve_domain_with_gpt(company_name: str, country: str = "", city: str = ""
     if not OPENAI_API_KEY:
         return None
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     prompt = f"""You are resolving the official website domain for a company and classifying its type.
 
@@ -395,7 +396,7 @@ def classify_account_type_with_homepage(company_name: str, homepage_text: str) -
     if not OPENAI_API_KEY or not homepage_text:
         return None
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     prompt = f"""Classify this organization based on its homepage content.
 

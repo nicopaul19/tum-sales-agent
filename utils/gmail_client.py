@@ -109,8 +109,13 @@ def find_existing_draft(service, to_email: str) -> Optional[str]:
     if not target:
         return None
 
+    # Each draft costs one API call to inspect; cap the scan so one contact
+    # can never burn hundreds of Gmail API calls on a large drafts folder.
+    max_pages = 3
+    pages_scanned = 0
     page_token = None
-    while True:
+    while pages_scanned < max_pages:
+        pages_scanned += 1
         params = {"userId": "me", "maxResults": 100}
         if page_token:
             params["pageToken"] = page_token

@@ -324,7 +324,7 @@ def extract_lead_from_screenshot(image_path: Path) -> List[Dict]:
         console.print("[red]Error: OPENAI_API_KEY not configured[/red]")
         return []
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     try:
         base64_image = encode_image(image_path)
@@ -671,7 +671,7 @@ def lookup_domain_with_llm(company_name: str) -> Optional[str]:
     if not OPENAI_API_KEY:
         return None
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     try:
         response = client.chat.completions.create(
@@ -727,7 +727,7 @@ def verify_domain_with_llm(company_name: str, candidate_domain: str) -> bool:
     if not OPENAI_API_KEY or not candidate_domain:
         return False
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     try:
         response = client.chat.completions.create(
@@ -980,7 +980,7 @@ def extract_entities_from_post(url: str, content: str) -> List[Dict]:
         console.print("[red]Error: OPENAI_API_KEY not configured[/red]")
         return []
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     try:
         response = client.beta.chat.completions.parse(

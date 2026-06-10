@@ -626,7 +626,6 @@ def generate_outreach(
     full_system_prompt += load_humanized_guidance("Strategic Partnerships")
 
     last_result = None
-    last_usage = None
     quality_feedback = ""
     for attempt in range(1, 4):
         response = client.beta.chat.completions.parse(
@@ -649,7 +648,19 @@ def generate_outreach(
                 cold_email_body=body,
             )
         last_result = result
-        last_usage = response.usage
+        # Log every attempt, not just the last one — quality-gate retries
+        # are real GPT-4o spend and must show up in cost reports.
+        log_api_usage(
+            "copywriter_agent", "generate_outreach", "gpt-4o",
+            response.usage,
+            {
+                "contact": contact.get("person_name", ""),
+                "company": contact.get("company_name", ""),
+                "variant": variant,
+                "sender": contact.get("campaign_sender", ""),
+                "attempt": attempt,
+            }
+        )
         issues = validate_outreach(result, include_linkedin=True)
         if not issues:
             break
@@ -664,17 +675,6 @@ def generate_outreach(
     result = last_result
     if result is None:
         raise RuntimeError("OpenAI returned no outreach result")
-
-    log_api_usage(
-        "copywriter_agent", "generate_outreach", "gpt-4o",
-        last_usage,
-        {
-            "contact": contact.get("person_name", ""),
-            "company": contact.get("company_name", ""),
-            "variant": variant,
-            "sender": contact.get("campaign_sender", ""),
-        }
-    )
 
     final_issues = validate_outreach(result, include_linkedin=True)
     if final_issues:
@@ -787,7 +787,7 @@ def run_copywriter(
     console.print(f"[cyan]Found {len(contacts)} contacts needing messages[/cyan]")
 
     # Initialize OpenAI
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     # Process each contact
     generated = 0
@@ -861,14 +861,19 @@ def run_copywriter(
                 if ok:
                     written += 1
                     console.print(f"  [green]Written to Notion[/green]")
-                    # Also create a Gmail draft for team review
-                    gmail_create_draft(
-                        to_email=contact.get("email", ""),
-                        subject=messages.cold_email_subject,
-                        body=messages.cold_email_body,
-                        contact_name=person,
-                        company_name=company,
-                    )
+                    # Also create a Gmail draft for team review. A Gmail failure
+                    # must not mark the contact as errored: the Notion write
+                    # already succeeded and the draft can be recreated later.
+                    try:
+                        gmail_create_draft(
+                            to_email=contact.get("email", ""),
+                            subject=messages.cold_email_subject,
+                            body=messages.cold_email_body,
+                            contact_name=person,
+                            company_name=company,
+                        )
+                    except Exception as gmail_error:
+                        console.print(f"  [yellow]Gmail draft skipped: {gmail_error}[/yellow]")
                 else:
                     errors += 1
             else:

@@ -21,13 +21,14 @@ from pathlib import Path
 from typing import Iterable, Optional
 from urllib.parse import urljoin, urlparse
 
-import requests as http_requests
 from bs4 import BeautifulSoup
 from rich.console import Console
 from rich.table import Table
 
 # Add parent to path for imports.
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from utils import resilient_http as http_requests
 
 from utils.config import LOGS_DIR, NOTION_TOKEN
 from utils.notion_client import _notion_api_headers
