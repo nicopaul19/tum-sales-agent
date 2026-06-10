@@ -14,7 +14,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-import requests as http_requests
+from utils import resilient_http as http_requests
 from rich.console import Console
 from rich.table import Table
 

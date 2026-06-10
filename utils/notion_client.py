@@ -3,7 +3,7 @@ Notion API Client for uploading qualified leads.
 """
 import math
 import re
-import requests as http_requests
+from utils import resilient_http as http_requests
 from notion_client import Client
 from rich.console import Console
 from typing import Optional, List

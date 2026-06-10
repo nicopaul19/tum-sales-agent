@@ -25,7 +25,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import requests as http_requests
 from bs4 import BeautifulSoup
 from openai import OpenAI
 from pydantic import BaseModel, Field
@@ -35,6 +34,8 @@ from rich.panel import Panel
 
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from utils import resilient_http as http_requests
 
 from utils.config import OPENAI_API_KEY, NOTION_TOKEN, NOTION_DB_ACCOUNTS_ID
 from utils.api_logger import log_api_usage
@@ -395,7 +396,7 @@ def run_ngo_scraper(
         console.print("[red]Error: NOTION_TOKEN or NOTION_DB_ACCOUNTS_ID not configured[/red]")
         return
 
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     # --- Step 1: Fetch NGOs from Notion ---
     console.print("\n[cyan]Step 1: Fetching NGO accounts from Notion...[/cyan]")

@@ -20,7 +20,7 @@ import time
 from datetime import datetime
 from typing import Optional
 
-import requests as http_requests
+from utils import resilient_http as http_requests
 from rich.console import Console
 
 from utils.config import NOTION_TOKEN

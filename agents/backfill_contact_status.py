@@ -22,11 +22,12 @@ import argparse
 from collections import defaultdict
 from pathlib import Path
 
-import requests as http_requests
 from rich.console import Console
 from rich.table import Table
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from utils import resilient_http as http_requests
 
 from utils.config import NOTION_TOKEN, NOTION_DB_CONTACTS_ID, NOTION_DB_ACCOUNTS_ID
 from utils.notion_client import _notion_api_headers

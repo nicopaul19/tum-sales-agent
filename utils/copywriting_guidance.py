@@ -11,7 +11,7 @@ import re
 from functools import lru_cache
 from typing import Optional
 
-import requests
+from utils import resilient_http as requests
 
 from utils.config import NOTION_TOKEN
 

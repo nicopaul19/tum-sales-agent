@@ -756,7 +756,7 @@ def run_feedback(dry_run: bool = False, min_data: int = 10):
 
     # Step 6: Run GPT-4o analysis
     console.print(f"\n[cyan]Running GPT-4o pattern analysis ({len(successes)} successes, {len(failures)} failures)...[/cyan]")
-    client = OpenAI(api_key=OPENAI_API_KEY)
+    client = OpenAI(api_key=OPENAI_API_KEY, timeout=180.0, max_retries=4)
 
     analysis = run_gpt_analysis(
         successes,
