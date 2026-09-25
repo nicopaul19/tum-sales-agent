@@ -28,39 +28,19 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.update_ai_for_good_hackathon_drafts import build_body, list_rewrites  # noqa: E402
-from utils.config import DATA_DIR, NOTION_DB_ACCOUNTS_ID, NOTION_DB_CONTACTS_ID  # noqa: E402
+from utils.config import (  # noqa: E402
+    DATA_DIR,
+    FUTURE_OWNER_ROTATION,
+    NOTION_DB_ACCOUNTS_ID,
+    NOTION_DB_CONTACTS_ID,
+    PARTNERSHIP_OWNERS,
+)
 from utils.gmail_client import LABEL_SCOPES, _build_raw_message, _get_gmail_service  # noqa: E402
 from utils.notion_client import _notion_api_headers  # noqa: E402
 
 
-CURRENT_CAMPAIGN_OWNERS = [
-    {
-        "name": "Timon",
-        "full_name": "Timon",
-        "notion_id": "notion-user-uuid",
-        "gmail_label": "Strategic Partnerships/Timon",
-    },
-    {
-        "name": "Felix",
-        "full_name": "Team Member",
-        "notion_id": "notion-user-uuid",
-        "gmail_label": "Strategic Partnerships/Felix",
-    },
-    {
-        "name": "Till",
-        "full_name": "Till",
-        "notion_id": "notion-user-uuid",
-        "gmail_label": "Strategic Partnerships/Till",
-    },
-    {
-        "name": "Jaron",
-        "full_name": "Team Member",
-        "notion_id": "notion-user-uuid",
-        "gmail_label": "Strategic Partnerships/Jaron",
-    },
-]
-
-FUTURE_OWNER_ROTATION = ["Timon", "Felix", "Till"]
+# Owner names / Notion IDs / Gmail labels come from the gitignored team.json
+CURRENT_CAMPAIGN_OWNERS = PARTNERSHIP_OWNERS
 
 
 @dataclass

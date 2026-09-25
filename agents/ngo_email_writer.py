@@ -4,7 +4,7 @@ the NGO_180526_InvoiceManagement campaign.
 
 No GPT-4o. Pure template fill from Notion account fields.
 
-Splits accounts 50/50 between two owners (First Owner / Second Owner),
+Splits accounts 50/50 between two owners (team.json "ngo_owners"),
 sets Owner* (people), Campaign Sender, and generates the correct email body
 and subject for each account in the right language.
 
@@ -38,7 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils import resilient_http as http_requests
 
-from utils.config import NOTION_TOKEN, NOTION_DB_ACCOUNTS_ID
+from utils.config import NOTION_TOKEN, NOTION_DB_ACCOUNTS_ID, NGO_OWNERS
 from utils.notion_client import NOTION_API_VERSION
 from utils.campaign_tracker import load_campaign_guidance, sync_campaign_tracker
 
@@ -46,19 +46,8 @@ console = Console()
 
 CAMPAIGN_ID = "NGO_180526_InvoiceManagement"
 
-# Owners — full names used in email body, Notion IDs for Owner* field
-OWNERS = [
-    {
-        "full_name": "First Owner",
-        "first_name": "Carlo",
-        "notion_id": "notion-user-uuid",
-    },
-    {
-        "full_name": "Second Owner",
-        "first_name": "Lisa",
-        "notion_id": "notion-user-uuid",
-    },
-]
+# Owners — full names used in email body, Notion IDs for Owner* field (team.json)
+OWNERS = NGO_OWNERS
 
 DACH_COUNTRIES = {
     "germany", "austria", "switzerland", "liechtenstein",
@@ -335,10 +324,10 @@ def run(dry_run: bool = False, force: bool = False):
     half = len(sorted_accounts) // 2
     owner_map: dict[str, dict] = {}
     for acc in sorted_accounts[:half]:
-        owner_map[acc["page_id"]] = OWNERS[0]   # Carlo
+        owner_map[acc["page_id"]] = OWNERS[0]
     for acc in sorted_accounts[half:]:
-        owner_map[acc["page_id"]] = OWNERS[1]   # Lisa
-    # Handle odd count: extra goes to Carlo
+        owner_map[acc["page_id"]] = OWNERS[1]
+    # Handle odd count: extra goes to the first owner
     if len(sorted_accounts) % 2 == 1:
         owner_map[sorted_accounts[half]["page_id"]] = OWNERS[0]
 
@@ -349,7 +338,7 @@ def run(dry_run: bool = False, force: bool = False):
     )
 
     written = skipped = errors = german = english = 0
-    carlo_count = lisa_count = 0
+    first_owner_count = second_owner_count = 0
     variant_counts = {"A": 0, "B": 0}
 
     for i, acc in enumerate(accounts, 1):
@@ -373,9 +362,9 @@ def run(dry_run: bool = False, force: bool = False):
         else:
             english += 1
         if owner == OWNERS[0]:
-            carlo_count += 1
+            first_owner_count += 1
         else:
-            lisa_count += 1
+            second_owner_count += 1
 
         console.print(Panel(
             f"[cyan]Owner:[/cyan] {owner['full_name']}   [cyan]Variant:[/cyan] {variant}   [cyan]Subject:[/cyan] {subject}\n\n{body}",
@@ -404,8 +393,8 @@ def run(dry_run: bool = False, force: bool = False):
     t.add_row("Skipped (already have email)", str(skipped))
     t.add_row("German emails", str(german))
     t.add_row("English emails", str(english))
-    t.add_row(f"Assigned to {OWNERS[0]['full_name']}", str(carlo_count))
-    t.add_row(f"Assigned to {OWNERS[1]['full_name']}", str(lisa_count))
+    t.add_row(f"Assigned to {OWNERS[0]['full_name']}", str(first_owner_count))
+    t.add_row(f"Assigned to {OWNERS[1]['full_name']}", str(second_owner_count))
     t.add_row("Variant A / B", f"{variant_counts['A']} / {variant_counts['B']}")
     t.add_row("Written to Notion", str(written))
     t.add_row("Errors", str(errors))

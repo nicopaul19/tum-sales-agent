@@ -205,8 +205,7 @@ def convert_md_to_pdf():
         {html_body}
         <hr style="margin-top: 48pt;">
         <p style="text-align: center; color: #888; font-size: 9pt;">
-            Questions or feedback? team@example.com<br>
-            Built with ❤️ by TUM Social AI — https://tum-socialaiclub.de
+                        Built with ❤️ by TUM Social AI — https://tum-socialaiclub.de
         </p>
     </body>
     </html>

@@ -28,6 +28,26 @@ NOTION_DB_CAMPAIGNS_ID = os.getenv("NOTION_DB_CAMPAIGNS_ID")  # Campaign Trackin
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 REPORT_RECIPIENT_EMAIL = os.getenv("REPORT_RECIPIENT_EMAIL")
+
+# Gmail draft sender (shared partnerships inbox alias)
+GMAIL_SENDER_ADDRESS = os.getenv("GMAIL_SENDER_ADDRESS", "")
+
+# Team config — names and Notion user IDs live in the gitignored team.json
+# (copy team.example.json and fill it in). Never hardcode them here.
+TEAM_CONFIG_PATH = PROJECT_ROOT / "team.json"
+
+
+def _load_team() -> dict:
+    if not TEAM_CONFIG_PATH.exists():
+        return {}
+    import json
+    return json.loads(TEAM_CONFIG_PATH.read_text(encoding="utf-8"))
+
+
+TEAM = _load_team()
+NGO_OWNERS: list[dict] = TEAM.get("ngo_owners", [])  # {full_name, first_name, notion_id}
+PARTNERSHIP_OWNERS: list[dict] = TEAM.get("partnership_owners", [])  # {name, full_name, notion_id, gmail_label}
+FUTURE_OWNER_ROTATION: list[str] = TEAM.get("future_owner_rotation", [])
 RANKING_REPORT_RECIPIENTS = os.getenv("RANKING_REPORT_RECIPIENTS")  # Comma-separated email list for ranking reports
 FEEDBACK_REPORT_RECIPIENTS = os.getenv("FEEDBACK_REPORT_RECIPIENTS")  # Comma-separated email list for feedback reports
 DEFAULT_CAMPAIGN_SENDER = os.getenv("DEFAULT_CAMPAIGN_SENDER")  # Optional default outreach sender full name

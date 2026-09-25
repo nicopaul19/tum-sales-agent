@@ -1,7 +1,7 @@
 """
 Gmail Draft Client for TUM Social AI outreach.
 
-Creates email drafts in shared-inbox@example.com via Gmail API (OAuth).
+Creates email drafts in the shared partnerships inbox via Gmail API (OAuth).
 The team reviews and sends them manually.
 
 Auth: gmail_token.json must exist (run setup_gmail_auth.py once to generate it).
@@ -16,6 +16,8 @@ from typing import Optional
 
 from rich.console import Console
 
+from utils.config import GMAIL_SENDER_ADDRESS
+
 console = Console()
 
 BASE_DIR = Path(__file__).parent.parent
@@ -29,7 +31,7 @@ LABEL_SCOPES = [
 ]
 SCOPES = COMPOSE_SCOPES
 
-SENDER_ADDRESS = "partnerships-inbox@example.com"
+SENDER_ADDRESS = GMAIL_SENDER_ADDRESS  # set GMAIL_SENDER_ADDRESS in .env
 SENDER_DISPLAY = "TUM Social AI Club"
 
 
@@ -149,7 +151,7 @@ def create_draft(
     update_existing: bool = True,
 ) -> Optional[str]:
     """
-    Create a Gmail draft in shared-inbox@example.com.
+    Create a Gmail draft in the shared partnerships inbox.
 
     Args:
         to_email: Recipient email address.

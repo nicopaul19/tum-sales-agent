@@ -1,0 +1,10 @@
+{
+  "ngo_owners": [
+    {"full_name": "First Owner", "first_name": "First", "notion_id": "notion-user-uuid"},
+    {"full_name": "Second Owner", "first_name": "Second", "notion_id": "notion-user-uuid"}
+  ],
+  "partnership_owners": [
+    {"name": "First", "full_name": "First Owner", "notion_id": "notion-user-uuid", "gmail_label": "Strategic Partnerships/First"}
+  ],
+  "future_owner_rotation": ["First"]
+}

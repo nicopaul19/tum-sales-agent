@@ -2,7 +2,7 @@
 Rewrite existing partnerships Gmail drafts for AI for Good Hackathon outreach.
 
 This is intentionally scoped to attachment-free drafts sent from
-partnerships-inbox@example.com. It preserves each recipient and the visible
+the shared partnerships inbox. It preserves each recipient and the visible
 sender signature, while replacing the subject/body with the current hackathon
 RRR framework.
 """
@@ -115,9 +115,9 @@ def greeting_from_body(body: str, to_header: str) -> str:
 def sender_from_body(body: str) -> str:
     lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
     if not lines:
-        return DEFAULT_CAMPAIGN_SENDER or "Team Member"
+        return DEFAULT_CAMPAIGN_SENDER or ""
     if lines[-1].lower().startswith("best"):
-        return DEFAULT_CAMPAIGN_SENDER or "Team Member"
+        return DEFAULT_CAMPAIGN_SENDER or ""
     return lines[-1]
 
 

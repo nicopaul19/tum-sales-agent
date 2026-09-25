@@ -30,9 +30,9 @@ The system is intentionally no longer a fixed weekly campaign machine. Campaign 
 | `ranking_agent` filters | Prevents obvious bad leads from entering campaigns. | Student clubs, university associations, other student initiatives, very early startups, companies with no AI/impact/ecological angle, traditional finance, gambling, tobacco/alcohol, weapons/defense, event services, catering, and similar support vendors are disqualified or heavily penalized. |
 | `apollo_enrichment_agent` | Adds verified company/contact data before Notion upload. | The ranker writes with-contact, no-contact, and joint Apollo-ready CSVs. The Apollo flow creates `apollo_enrichment_batches.json`, merges Apollo connector/session-log or UI export results into `apollo_enriched_contacts_for_review.csv`, flags senior marketing/recruiting/people, partnerships/BD, campus/university relations, ecosystem, and community contacts that still need a real mobile number, and emits `apollo_upload_ready.csv` with only safe import rows. |
 | `upload_agent` | Uploads Apollo CSVs into Notion Accounts and Contacts. | Requires an explicit campaign sender. It patches/validates required Notion properties, deduplicates accounts by Apollo Account ID/domain/name, deduplicates contacts by email/LinkedIn/name, links Contacts to Accounts, writes campaign ID, sender, account metadata, contact metadata, and safely updates existing records without resetting useful pipeline status unless intended. |
-| `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus Campaign Tracker history, processed `data/prompts/outreach_learnings.md`, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It always assigns A/B Variant A or B, writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion, and automatically creates a Gmail draft in `partnerships-inbox@example.com` for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
+| `copywriter_agent` | Generates campaign-specific outreach in Notion **and creates Gmail drafts**. | Uses the shared outreach skill prompt plus Campaign Tracker history, processed `data/prompts/outreach_learnings.md`, campaign sender, contact/account context, trigger event, company mission, employee/funding context, and sometimes careers-page context. It always assigns A/B Variant A or B, writes LinkedIn first cold, LinkedIn follow-up, cold email subject, and cold email body to Notion, and automatically creates a Gmail draft in the shared partnerships inbox for every contact with an email address. The team reviews and sends drafts manually. Copy is short, English, specific to the trigger, sender-aware, and constrained against invented facts. |
 | `campaign_tracker` | Maintains the Notion Campaign Tracker database. | Extracts every `Campaign ID` from Accounts, relates campaign pages only to Accounts, and records campaign trigger, target audience, targeting reasoning, outreach summary, contact engagement counts, and A/B winner. Upload, copywriter, NGO email writer, and feedback runs sync it automatically; `python agent.py campaigns` backfills or repairs it manually. |
-| `owner_assignment_agent` | Splits campaign ownership by account after drafts exist. | Runs `python scripts/assign_partnership_outreach.py --apply`. It balances the current campaign across Timon, Felix, Till, and Jaron; future campaigns rotate only across Timon, Felix, and Till. One account has one sender, and every contact under that account gets the same Notion `Contact Owner*`, `Campaign Sender`, and draft sender signature. Gmail labels can be applied after OAuth has label/modify scopes. |
+| `owner_assignment_agent` | Splits campaign ownership by account after drafts exist. | Runs `python scripts/assign_partnership_outreach.py --apply`. It balances the current campaign across the owners in `team.json` (`partnership_owners`); future campaigns rotate across `future_owner_rotation`. One account has one sender, and every contact under that account gets the same Notion `Contact Owner*`, `Campaign Sender`, and draft sender signature. Gmail labels can be applied after OAuth has label/modify scopes. |
 | `linkedin_manager` | Reviews LinkedIn connection/follow-up actions. | Parses saved LinkedIn connections HTML, matches LinkedIn URLs to Notion Contacts/Accounts, detects new connections, identifies follow-up needs after 3-5 days, marks ghosted leads after the configured window, drafts follow-up text, and avoids downgrading Notion statuses through a status hierarchy guard. |
 | `feedback_agent` | Turns outcome data and manual copywriter iterations into prompt learnings. | Reads resolved outcomes, analyzes A/B test results, syncs the Campaign Tracker, scans the Notion Iterations page, distills reusable guidance into `data/prompts/outreach_learnings.md`, and moves processed iteration notes into the Processed section. |
 
@@ -64,7 +64,7 @@ You do **not** need coding knowledge. You need:
 - A local clone of this repository.
 - Python 3.9+.
 - Access to the shared Notion workspace and the required databases.
-- An OpenAI API key or a vibe-coding environment license. Ask Nicolas if you need to use his OpenAI credits.
+- An OpenAI API key or a vibe-coding environment license. Ask the project lead if you need shared OpenAI credits.
 - Optional: Gmail app password if you want email reports sent from your laptop.
 
 ### API Cost Basics
@@ -154,8 +154,8 @@ Examples:
 
 ```bash
 python agent.py apollo-enrich --mcp-json "session-or-apollo-output.jsonl"
-python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Team Member"
-python agent.py copywrite --campaign Workflow_0505 --sender "Team Member"
+python agent.py upload --csv "data/tables/apollo_upload_ready.csv" --sender "Full Name"
+python agent.py copywrite --campaign Workflow_0505 --sender "Full Name"
 ```
 
 The generated messages use:
@@ -171,7 +171,7 @@ After drafts are created, run:
 python scripts/assign_partnership_outreach.py --apply
 ```
 
-For the current 87-message campaign, the script splits ownership across Timon, Felix, Till, and Jaron as evenly as possible while keeping all contacts from the same account with the same owner. For future strategic partnerships campaigns, use only Timon, Felix, and Till as the owner rotation.
+For the current 87-message campaign, the script splits ownership across the configured owners as evenly as possible while keeping all contacts from the same account with the same owner. For future strategic partnerships campaigns, the rotation is set in team.json.
 
 The ownership rule is strict:
 
@@ -197,7 +197,7 @@ Put these as recurring calendar blockers, but execute campaign actions only when
 | Cadence | Blocker | Action |
 |---|---|---|
 | Continuous | LinkedIn input capture | Save promising posts, profiles, screenshots, and manual contacts as you browse. |
-| Continuous | Trigger sourcing | Actively scrape LinkedIn posts, hiring pages, hackathon/sponsorship pages, event pages, accelerator/news posts, and other sources where a company shows a fresh reason to talk. Send strong trigger events and contact ideas to Jaron so they can be included in upcoming campaigns. |
+| Continuous | Trigger sourcing | Actively scrape LinkedIn posts, hiring pages, hackathon/sponsorship pages, event pages, accelerator/news posts, and other sources where a company shows a fresh reason to talk. Send strong trigger events and contact ideas to the campaign lead so they can be included in upcoming campaigns. |
 | On campaign start | Input cleanup + top leads + Apollo | Run `python agent.py collect`, scan inputs, run `python agent.py rank`, run Apollo search/enrichment through the connector, then normalize with `python agent.py apollo-enrich`. |
 | After Apollo | Upload + copywriter | Run upload with `--sender`, then copywrite for the campaign. |
 | Campaign launch | Owner split + Slack launch note | Assign owners, post the launch message in `#strategic-partnerships`, and split sending over four days for four senders or three days for three senders. Keep the team at 20-30 sent outreach emails per day total to protect deliverability. |
@@ -254,7 +254,7 @@ LinkedIn screenshots / URLs / manual leads
   -> agent.py upload --csv data/tables/apollo_upload_ready.csv --sender ...
   -> Notion Accounts / Contacts
   -> agent.py copywrite --campaign ... --sender ...
-  -> outreach messages in Notion + Gmail drafts in partnerships-inbox@example.com
+  -> outreach messages in Notion + Gmail drafts in the shared partnerships inbox
   -> scripts/assign_partnership_outreach.py --apply
   -> Notion owners + sender signatures + teammate Gmail folders
   -> Slack launch note in #strategic-partnerships
@@ -290,9 +290,9 @@ The feedback agent will pick it up on the next Monday run and mark it as **Proce
 
 ### Gmail Draft Review
 
-After every copywriter run, drafts appear in `partnerships-inbox@example.com`:
+After every copywriter run, drafts appear in the shared partnerships inbox:
 
-1. Log into Gmail as `partnerships-inbox@example.com`
+1. Log into the shared partnerships Gmail account
 2. Open **Drafts** and your folder under **Strategic Partnerships**
 3. Review the messages assigned to you, edit if needed, and send only on your assigned sending day
 4. Keep the whole team to 20-30 sent outreach emails per day total
@@ -301,13 +301,13 @@ The draft subject and body match exactly what was written to Notion.
 
 ### Gmail OAuth (One-Time Setup Per Machine)
 
-The OAuth token is already set up on Nicolas's machine (`gmail_token.json`). If you're running the agent from a different machine:
+The OAuth token is already set up on the project lead's machine (`gmail_token.json`). If you're running the agent from a different machine:
 
 ```bash
 python setup_gmail_auth.py
 ```
 
-This opens a browser — log in as `shared-inbox@example.com` and grant access. The token is saved locally and never committed to Git.
+This opens a browser — log in with the shared partnerships Gmail account and grant access. The token is saved locally and never committed to Git.
 
 ---
 

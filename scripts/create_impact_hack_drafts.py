@@ -336,7 +336,7 @@ def load_contacts(
             record.account_owner
             or record.campaign_sender
             or DEFAULT_CAMPAIGN_SENDER
-            or "Team Member"
+            or ""
         ).strip()
         key_base = (record.email or f"no-email:{record.page_id}").lower()
         record.duplicate_key = f"{key_base}|{record.account_id or record.company_name.lower()}"
@@ -446,7 +446,7 @@ def template_angle(record: ContactRecord) -> str:
 def generate_template_email(record: ContactRecord, sender: str = "") -> EmailDraft:
     company = short_company_name(record.company_name)
     greeting = first_name(record.name) or f"{company} team"
-    sender_name = (sender or record.sender_name or DEFAULT_CAMPAIGN_SENDER or "Team Member").strip()
+    sender_name = (sender or record.sender_name or DEFAULT_CAMPAIGN_SENDER or "").strip()
     body = (
         f"Hi {greeting},\n\n"
         f"are you currently trying to get more visibility in the Munich university ecosystem for {company}? "

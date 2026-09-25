@@ -1,5 +1,5 @@
 """
-One-time Gmail OAuth setup for shared-inbox@example.com.
+One-time Gmail OAuth setup for the shared partnerships Gmail account.
 
 Run this once — it opens a browser, you log in, and the token is saved to
 gmail_token.json for all future agent use.
